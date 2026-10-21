@@ -8,7 +8,19 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+# The toy backend, shared strategies, render loops, tail audit and counting
+# allocator of core-types §2.15. The crate's own tests turn it on through the
+# self dev-dependency below, so `cargo test` needs no extra flags.
+testkit = ["dep:proptest"]
+
 [dependencies]
+takedown-core.workspace = true
+proptest = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest.workspace = true
+takedown-render = { path = ".", features = ["testkit"] }
 
 [lints]
 workspace = true

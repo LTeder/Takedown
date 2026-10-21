@@ -16,6 +16,11 @@ takedown-evidence = { path = "crates/evidence" }
 takedown-drums = { path = "crates/drums" }
 takedown-render = { path = "crates/render" }
 takedown-midi = { path = "crates/midi" }
+serde = { version = "1", features = ["derive"] }
+# float_roundtrip: declared once so feature unification cannot lose it (core-types §2.0).
+serde_json = { version = "1", features = ["float_roundtrip"] }
+blake3 = "1"
+proptest = "1"
 
 [workspace.lints.rust]
 unsafe_code = "warn"

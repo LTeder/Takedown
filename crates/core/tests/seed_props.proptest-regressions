@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 792e4786e2932b26e4bf3966bc7a29f8ee16076703dd57234639b33272820c43 # shrinks to mut t = SeedTree { root: Seed(0000000000000000), rolls: {}, locked: {}, regions: [] }, a = Body, span = TimelineSpan { start: TimelinePos(766), end: TimelinePos(1001) }, extra = []

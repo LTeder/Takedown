@@ -1,0 +1,501 @@
+{
+  "schema_version": 1,
+  "id": "1111111111111111111111111111111111111111111111111111111111111111",
+  "output_rate": 48000,
+  "takes": {
+    "841894d446f25040f861daa05669c5f17c676973c408de714f4eecb8c91a5409": {
+      "id": "841894d446f25040f861daa05669c5f17c676973c408de714f4eecb8c91a5409",
+      "audio": {
+        "rate": 48000,
+        "channels": 1,
+        "frames": 4800
+      },
+      "source": {
+        "kind": "recorded",
+        "device": "Scarlett 2i2 \"USB\"",
+        "latency_compensated": true
+      },
+      "anchor": {
+        "host_rate": 48000,
+        "host_sample_at_start": -123456789,
+        "ppq_at_start": 16.5,
+        "tempo_bpm": 93.7,
+        "time_sig": [
+          7,
+          8
+        ]
+      },
+      "name": "beatbox — take 1",
+      "captured_at": "2026-10-21T09:30:00Z"
+    },
+    "a745a3a5af5a926c2b5f0a0ebc2c35fb76028deebedec8f88476b3f0352090c7": {
+      "id": "a745a3a5af5a926c2b5f0a0ebc2c35fb76028deebedec8f88476b3f0352090c7",
+      "audio": {
+        "rate": 44100,
+        "channels": 2,
+        "frames": 4410
+      },
+      "source": {
+        "kind": "dropped",
+        "original_name": "hum take 3.wav",
+        "source_format": "wav pcm24"
+      },
+      "anchor": null,
+      "name": "hum",
+      "captured_at": "2026-10-21T09:41:12+02:00"
+    }
+  },
+  "palettes": {
+    "3e3f3f9d805af4fe008e3e19fc36968148de0903e4c05705beda4d28ab6c0e56": {
+      "name": "glass"
+    },
+    "56bd2aac294ec6eff3ffb269952e7ed4f1009b30a8e9b738ae653f5e06f85175": {
+      "name": "grit"
+    }
+  },
+  "teach_set": "2222222222222222222222222222222222222222222222222222222222222222",
+  "interpretations": [
+    {
+      "id": 0,
+      "name": "take 1 / grit",
+      "take": "841894d446f25040f861daa05669c5f17c676973c408de714f4eecb8c91a5409",
+      "source": {
+        "kind": "lens",
+        "evidence": "d5a7051b94dd5c8bcde0a10f6710c0f88d07baa1772fcab8bc22840fe239ab12",
+        "hits": "3333333333333333333333333333333333333333333333333333333333333333",
+        "edits": [
+          {
+            "id": 1,
+            "edit": {
+              "kind": "force_pitch",
+              "span": [
+                480,
+                960
+              ],
+              "st": 62.37
+            }
+          },
+          {
+            "id": 2,
+            "edit": {
+              "kind": "split_at",
+              "at": 1200,
+              "articulation": "legato"
+            }
+          },
+          {
+            "id": 3,
+            "edit": {
+              "kind": "join_at",
+              "at": 3600,
+              "tol": 960
+            }
+          },
+          {
+            "id": 4,
+            "edit": {
+              "kind": "force_role",
+              "hit": {
+                "at": 2400,
+                "tol": 1200
+              },
+              "role": "snare"
+            }
+          },
+          {
+            "id": 5,
+            "edit": {
+              "kind": "delete_hit",
+              "hit": {
+                "at": 4000,
+                "tol": 240
+              }
+            }
+          },
+          {
+            "id": 6,
+            "edit": {
+              "kind": "add_hit",
+              "hit": {
+                "at": 2400,
+                "tol": 1200
+              },
+              "dur": 2400,
+              "role": "kick",
+              "vel": 100
+            }
+          },
+          {
+            "id": 7,
+            "edit": {
+              "kind": "mute_span",
+              "span": [
+                4200,
+                4800
+              ]
+            }
+          },
+          {
+            "id": 8,
+            "edit": {
+              "kind": "split_at",
+              "at": 3000,
+              "articulation": "retrigger"
+            }
+          }
+        ]
+      },
+      "lens": {
+        "palette": {
+          "name": "grit",
+          "id": "56bd2aac294ec6eff3ffb269952e7ed4f1009b30a8e9b738ae653f5e06f85175"
+        },
+        "sliders": {
+          "mouth_amount": 0.5,
+          "fidelity": 1.0,
+          "mangle": 0.3,
+          "timing_feel": -0.0,
+          "register_st": -12,
+          "glide_retrigger": 1e-45
+        },
+        "locks": [
+          "mangle",
+          "register"
+        ]
+      },
+      "seeds": {
+        "root": "deadbeef01234567",
+        "rolls": {
+          "body": 2,
+          "mangle": 1
+        },
+        "locked": [
+          "timing_feel"
+        ],
+        "regions": [
+          {
+            "aspect": "body",
+            "span": [
+              0,
+              2400
+            ],
+            "roll": 2
+          },
+          {
+            "aspect": "mangle",
+            "span": [
+              1000,
+              3000
+            ],
+            "roll": 1
+          }
+        ]
+      },
+      "midi": {
+        "profile": {
+          "version": 1,
+          "bend_range_st": 24,
+          "phrase_channels": [
+            1,
+            3
+          ],
+          "hit_channels": [
+            4,
+            15
+          ],
+          "cc_bright": 74,
+          "cc_breath": 2,
+          "cc_vowel": [
+            16,
+            17
+          ],
+          "roles": {
+            "keys": {
+              "clap": 39,
+              "crash": 49,
+              "hat_closed": 42,
+              "hat_open": 46,
+              "kick": 36,
+              "perc": 56,
+              "rim": 37,
+              "snare": 38,
+              "tom_high": 50,
+              "tom_low": 45
+            },
+            "fallback": "perc"
+          },
+          "unassigned": "hits"
+        },
+        "time": {
+          "ppq": 480,
+          "tempo": [
+            {
+              "tick": 0,
+              "us_per_quarter": 640341
+            },
+            {
+              "tick": 1920,
+              "us_per_quarter": 500000
+            }
+          ],
+          "origin_tick": 960
+        }
+      }
+    },
+    {
+      "id": 9,
+      "name": "hum / glass",
+      "take": "a745a3a5af5a926c2b5f0a0ebc2c35fb76028deebedec8f88476b3f0352090c7",
+      "source": {
+        "kind": "lens",
+        "evidence": "c29dedab2d137a4407b983766671bf35ce6aab20fc54ae5749f212f962252afc",
+        "hits": null,
+        "edits": []
+      },
+      "lens": {
+        "palette": {
+          "name": "glass",
+          "id": "3e3f3f9d805af4fe008e3e19fc36968148de0903e4c05705beda4d28ab6c0e56"
+        },
+        "sliders": {
+          "mouth_amount": 0.0,
+          "fidelity": 0.75,
+          "mangle": 1.0,
+          "timing_feel": 0.1,
+          "register_st": 36,
+          "glide_retrigger": -1.0
+        },
+        "locks": []
+      },
+      "seeds": {
+        "root": "0000000000000007",
+        "rolls": {},
+        "locked": [],
+        "regions": []
+      },
+      "midi": {
+        "profile": {
+          "version": 1,
+          "bend_range_st": 48,
+          "phrase_channels": [
+            1,
+            3
+          ],
+          "hit_channels": [
+            4,
+            15
+          ],
+          "cc_bright": 74,
+          "cc_breath": 2,
+          "cc_vowel": [
+            16,
+            17
+          ],
+          "roles": {
+            "keys": {
+              "clap": 39,
+              "crash": 49,
+              "hat_closed": 42,
+              "hat_open": 46,
+              "kick": 36,
+              "perc": 56,
+              "rim": 37,
+              "snare": 38,
+              "tom_high": 50,
+              "tom_low": 45
+            },
+            "fallback": "perc"
+          },
+          "unassigned": "hits"
+        },
+        "time": {
+          "ppq": 960,
+          "tempo": [
+            {
+              "tick": 0,
+              "us_per_quarter": 500000
+            }
+          ],
+          "origin_tick": 0
+        }
+      }
+    },
+    {
+      "id": 10,
+      "name": "edited in Reaper",
+      "take": "841894d446f25040f861daa05669c5f17c676973c408de714f4eecb8c91a5409",
+      "source": {
+        "kind": "imported",
+        "control": "4444444444444444444444444444444444444444444444444444444444444444",
+        "file": "c48fd71f7d66e262c462099f6735734a4c58591435f900d357609e91ff9afb01"
+      },
+      "lens": {
+        "palette": {
+          "name": "grit (old name)",
+          "id": "56bd2aac294ec6eff3ffb269952e7ed4f1009b30a8e9b738ae653f5e06f85175"
+        },
+        "sliders": {
+          "mouth_amount": 0.25,
+          "fidelity": 0.5,
+          "mangle": 0.875,
+          "timing_feel": 0.5,
+          "register_st": 0,
+          "glide_retrigger": 0.0
+        },
+        "locks": [
+          "glide_retrigger"
+        ]
+      },
+      "seeds": {
+        "root": "ffffffffffffffff",
+        "rolls": {
+          "pitch_reading": 4
+        },
+        "locked": [],
+        "regions": []
+      },
+      "midi": {
+        "profile": {
+          "version": 1,
+          "bend_range_st": 48,
+          "phrase_channels": [
+            1,
+            3
+          ],
+          "hit_channels": [
+            4,
+            15
+          ],
+          "cc_bright": 74,
+          "cc_breath": 2,
+          "cc_vowel": [
+            16,
+            17
+          ],
+          "roles": {
+            "keys": {
+              "clap": 39,
+              "crash": 49,
+              "hat_closed": 42,
+              "hat_open": 46,
+              "kick": 36,
+              "perc": 56,
+              "rim": 37,
+              "snare": 38,
+              "tom_high": 50,
+              "tom_low": 45
+            },
+            "fallback": "perc"
+          },
+          "unassigned": "hits"
+        },
+        "time": {
+          "ppq": 960,
+          "tempo": [
+            {
+              "tick": 0,
+              "us_per_quarter": 500000
+            }
+          ],
+          "origin_tick": 0
+        }
+      }
+    }
+  ],
+  "layers": [
+    {
+      "id": 11,
+      "interp": 0,
+      "gain_db": -3.5,
+      "mute": false,
+      "renders": {
+        "44100": {
+          "key": "e7d2d6bc14b3be2446db505a65edb96ffb7eb3ac98976fc228429d5fcd229792",
+          "inputs": {
+            "interp": "7777777777777777777777777777777777777777777777777777777777777777",
+            "evidence": "5555555555555555555555555555555555555555555555555555555555555555",
+            "hits": "6666666666666666666666666666666666666666666666666666666666666666",
+            "lens_version": 1,
+            "backends": [
+              {
+                "id": "plaits",
+                "version": 1
+              },
+              {
+                "id": "toy",
+                "version": 2
+              }
+            ],
+            "contract": 1,
+            "rate": 44100
+          },
+          "wav": "f2804f96342f1d20cdd15ed370fabe7fdc881cc27713674b95db9aecc5a66496",
+          "frames": 4410,
+          "platform": {
+            "arch": "x86_64",
+            "os": "windows"
+          }
+        },
+        "48000": {
+          "key": "f204fe019d7c5cd1e90b1c241aa6e8794c24014641aff1a0a4f9110b5bf9076c",
+          "inputs": {
+            "interp": "a295018790816e5cf12804abe271b16de3aee373447e201d2ca8d64755ea37ca",
+            "evidence": "5555555555555555555555555555555555555555555555555555555555555555",
+            "hits": "6666666666666666666666666666666666666666666666666666666666666666",
+            "lens_version": 1,
+            "backends": [
+              {
+                "id": "plaits",
+                "version": 1
+              }
+            ],
+            "contract": 1,
+            "rate": 48000
+          },
+          "wav": "cab0cf0d2fc1fa8f4d6aa97063951ff7f019225902f429c846f73d3a19e17c9d",
+          "frames": 4800,
+          "platform": {
+            "arch": "aarch64",
+            "os": "macos"
+          }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "interp": 10,
+      "gain_db": 0.0,
+      "mute": true,
+      "renders": {
+        "48000": {
+          "key": "18693ec48bd22a36d36dae66740c50c5c2034f119b70f2e63a57058165337c08",
+          "inputs": {
+            "interp": "002322974fe60102a61aee739a034e1793d80df71b60cfa2c23c6a54c0db864f",
+            "evidence": null,
+            "hits": null,
+            "lens_version": 1,
+            "backends": [
+              {
+                "id": "plaits",
+                "version": 1
+              },
+              {
+                "id": "toy",
+                "version": 2
+              }
+            ],
+            "contract": 1,
+            "rate": 48000
+          },
+          "wav": "5bfbcb9e068d14626d88e1553b64a8a2c9e1693616aacd828d44cefa09cf6006",
+          "frames": 4800,
+          "platform": {
+            "arch": "aarch64",
+            "os": "macos"
+          }
+        }
+      }
+    }
+  ],
+  "next_id": 13
+}

@@ -1,0 +1,68 @@
+# Frozen keys, seed derivations and noise values (core-types §2.2, §3.2, §3.3).
+# Any drift fails the build. Never edit a pinned value: a change of meaning is a
+# new name (and a new context or field), never a re-pin. Lines are `name = value`.
+
+# Seed derivation, the frozen SeedTree and counter-based noise (seed_props.rs).
+seed/derive/0000000000000000/""/0 = d4528a7baba5d41f
+seed/derive/0000000000000000/"aspect/body"/0 = f69f42fe32f58eef
+seed/derive/ffffffffffffffff/"kit/kick_body"/7 = 92907b5deed9a96e
+seed/derive/0123456789abcdef/"ordinal"/2 = 041129b65295d216
+seed/tree/aspect/body = 345e23e7b0c230a7
+seed/tree/aspect_at_60000/body = c1d503c1f69e33bc
+seed/tree/aspect/mangle = d9816280d4704ec2
+seed/tree/aspect_at_60000/mangle = d9816280d4704ec2
+seed/tree/aspect/timing_feel = a5deb536484129c5
+seed/tree/aspect_at_60000/timing_feel = a5deb536484129c5
+seed/tree/aspect/mouth_amount = 66ea3bd9c7eb0f8f
+seed/tree/aspect_at_60000/mouth_amount = 66ea3bd9c7eb0f8f
+seed/tree/aspect/pitch_reading = 2f94395bb069001e
+seed/tree/aspect_at_60000/pitch_reading = 2f94395bb069001e
+seed/tree/voice/body = 0ca9dcb563569278
+seed/tree/voice/mangle = e2a25d0654164b96
+seed/tree/trigger/body = 6fcb4bb233058afb
+seed/tree/trigger/mangle = 71a7589141d07015
+seed/noise/u64/0 = da0252afcea808cf
+seed/noise/unit/0 = 3f5a0252
+seed/noise/bipolar/0 = 3f3404a4
+seed/noise/u64/1 = 85f6074bcd4e18f4
+seed/noise/unit/1 = 3f05f607
+seed/noise/bipolar/1 = 3d3ec0e0
+seed/noise/u64/2 = d6cb6d261b6944dc
+seed/noise/unit/2 = 3f56cb6d
+seed/noise/bipolar/2 = 3f2d96da
+seed/noise/u64/1099511627776 = 5d6ef48c0a65f86d
+seed/noise/unit/1099511627776 = 3ebadde8
+seed/noise/bipolar/1099511627776 = be8a4430
+seed/noise/u64/18446744073709551615 = de642ee37da3a04d
+seed/noise/unit/18446744073709551615 = 3f5e642e
+seed/noise/bipolar/18446744073709551615 = 3f3cc85c
+
+# Key encoding under each KeyKind context, one key of every kind, and the
+# content ids of controls, hit sets, evidence and takes (key_props.rs).
+key/encoding/evidence = 8f22caea630bbab8fbe9c5735d283bad0750987e9b59948ced2585ee386fa032
+key/encoding/hit_set = 74e1d2be6ef6f66c1e9d5306f176855a72aa8bc8903081544185a97a1a7116ca
+key/encoding/teach_set = 99d744a0ebeeab31fb8ec5b4ce93962ad7b0bad4f60b33e8168bcc662fe96b77
+key/encoding/interp = d8ab3a23ac84aad944a6bfb7ce9ad31ffab48e61c064dfb66092e0abce002d26
+key/encoding/render = 039d60cc62d3eec62aad57c589cdf290d7c96b35f782c981eb277b002233724b
+key/teach_set = 70df1013dcfe9462f69b9bc1b4dadecb1b413e23fbbf17fce3d0a55dd9bc1f0f
+key/hit_set = 5501d952d0c6a2285c039588bf060889b472d2105507ab782a1d137ac56d9ce0
+key/hit_set/untaught = d80bffec9ab3f5074d105e06137c626d06a79f3e52554bee3aa48df9034f84f6
+key/seed_tree/encoding = a7417a52ce8a23988879aca9f82882dc089ccc50545014c6af74dda38520f88d
+key/content/control = 418f2301b60ca733fe113ff1c16403a8ee337b2f8ec24a614349f2c17de421e4
+key/content/hit_set = 337076c16154c5f27c88c85bb7db286328919d82d1fbb7533642fe9f8562c481
+key/evidence = c01865b406a73dde985a769c345278f23db52ee8fde803ae4198099d502513cf
+key/content/evidence = b21f894cdc0ba275ff2a2c22d09fa38a48998021c5b5dc7956dcf4e37ed759fe
+key/content/take = 29b6bec93d540df0eb15fb14959b8611b2f12d46dfb8edd5e00c6553acf06b4e
+key/interp/lens = 0374b75106b63ef60dfaa1d94ebb07119d16f7ade2d245cae20cee68b90c863f
+key/interp/imported = c6bb8d582dc09e56165a41500a30241874a99a7ed0155a4de72264a0edb41594
+key/render = e06bd078ccf09d0e0bb1507a4404b9dd54accf9a876c15e7a256288d20361807
+
+# The frozen schema-1 project fixture, project.v1.json: the interpretation key
+# of every interpretation and the render key of every render, as loaded by
+# today's code (persistence_props.rs). Every fixture loads forever, with these.
+fixture/project.v1/interp/0 = a295018790816e5cf12804abe271b16de3aee373447e201d2ca8d64755ea37ca
+fixture/project.v1/interp/9 = 1fd7a44ecba54ff77f181c2a356c268a15108d9295fcc56202eb4e371ad98dcb
+fixture/project.v1/interp/10 = 002322974fe60102a61aee739a034e1793d80df71b60cfa2c23c6a54c0db864f
+fixture/project.v1/render/11/44100 = e7d2d6bc14b3be2446db505a65edb96ffb7eb3ac98976fc228429d5fcd229792
+fixture/project.v1/render/11/48000 = f204fe019d7c5cd1e90b1c241aa6e8794c24014641aff1a0a4f9110b5bf9076c
+fixture/project.v1/render/12/48000 = 18693ec48bd22a36d36dae66740c50c5c2034f119b70f2e63a57058165337c08

@@ -11,6 +11,7 @@ __pycache__/
 
 # Local data and renders (golden set goes through LFS or a release, not plain git)
 research/data/
+research/out/
 exports/
 *.log
 
@@ -19,3 +20,5 @@ exports/
 Thumbs.db
 .idea/
 .vscode/
+# Agent worktrees
+.claude/worktrees/
