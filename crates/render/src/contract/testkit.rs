@@ -11,6 +11,8 @@
 //! - [`first_bit_difference`];
 //! - [`tail_overrun`], which renders the quiet parts through the backend and
 //!   returns their peak;
+//! - [`slice_purity_violation`], which audits a `SliceSource` for position
+//!   purity;
 //! - [`CountingAlloc`], which counts alloc, dealloc and realloc on the current
 //!   thread. Each test binary that needs it declares it as its
 //!   `#[global_allocator]`.
@@ -515,6 +517,47 @@ impl SliceSource for ToySlices {
         let noise = Seed(u64::from_le_bytes(first)).noise(STREAM_TAKE);
         Some((a..b).map(|q| noise.bipolar_at(q) * 0.5).collect())
     }
+}
+
+/// The first absolute output sample at which `source` is not position pure
+/// over `span` (see [`SliceSource`]): `span` is read whole, then as two
+/// pieces split at each of several points and as several inner windows, and
+/// every piece must equal the whole read at the same output samples, bit for
+/// bit and in length. `None` when every read agrees, or when `source` has no
+/// audio for `take`.
+pub fn slice_purity_violation(
+    source: &mut dyn SliceSource,
+    take: TakeId,
+    timeline: SampleRate,
+    out_rate: SampleRate,
+    span: TimelineSpan,
+) -> Option<u64> {
+    let (a, b) = (span.start().0, span.end().0);
+    let whole = source.read(take, span, out_rate)?;
+    let origin = rescale_ceil(a, timeline, out_rate).0;
+    let len = span.len();
+    let mut pieces = Vec::new();
+    for k in 1..4u64 {
+        let cut = a + len * k / 4;
+        pieces.push((a, cut));
+        pieces.push((cut, b));
+        let inset = len * k / 9;
+        pieces.push((a + inset, b - inset));
+    }
+    for (p, q) in pieces {
+        // Every piece lies inside `span`, so it is ordered and its samples
+        // are a range of the whole read.
+        let piece = TimelineSpan::new(TimelinePos(p), TimelinePos(q)).expect("p <= q");
+        let first = rescale_ceil(p, timeline, out_rate).0;
+        let last = rescale_ceil(q, timeline, out_rate).0;
+        let at = |n: u64| ((n - origin) as usize).min(whole.len());
+        let want = &whole[at(first)..at(last)];
+        let got = source.read(take, piece, out_rate).unwrap_or_default();
+        if let Some(i) = first_bit_difference(want, &got) {
+            return Some(first + i as u64);
+        }
+    }
+    None
 }
 
 /// A toy voice bound to a track: the backend's settings, its `Prepared`, the

@@ -10,12 +10,12 @@ use proptest::collection::{btree_set, vec};
 use proptest::prelude::*;
 use proptest::sample::select;
 use takedown_core::control::{
-    ControlFrame, ControlTrack, Curve, Curves, GateSpan, HitEvent, Lane, Link, MAX_HIT_MS,
+    ControlFrame, ControlTrack, Curve, Curves, EventKind, GateSpan, HitEvent, Link, MAX_HIT_MS,
     TrackParts, U7, Velocity,
 };
 use takedown_core::hit::RoleName;
 use takedown_core::ids::{Hash32, TakeId};
-use takedown_core::seed::{Aspect, Seed, SeedTree, VoiceSeeds};
+use takedown_core::seed::{Aspect, Seed, SeedTree, TriggerGroup, VoiceSeeds};
 use takedown_core::time::{
     MAX_RATE_HZ, MIN_RATE_HZ, SampleRate, TimelinePos, TimelineSpan, frame_start, frames_covering,
 };
@@ -512,28 +512,36 @@ pub fn region_probe_anchors(t: &SeedTree) -> Vec<TimelinePos> {
     out
 }
 
-/// One event's identity and seeds: (lane, anchor, ordinal, seeds), with the
-/// ordinal counting earlier events of the same (lane, anchor) in canonical
+/// One event's identity and seeds: (group, anchor, ordinal, seeds). The
+/// group is `None` for the phrase lane and the role name for a hit; the
+/// ordinal counts earlier events of the same (group, anchor) in canonical
 /// order.
 pub fn event_seeds(
     track: &ControlTrack,
     tree: &SeedTree,
     voice: &str,
-) -> Vec<(Lane, TimelinePos, u32, VoiceSeeds)> {
-    let mut counts: BTreeMap<(Lane, TimelinePos), u32> = BTreeMap::new();
+) -> Vec<(Option<RoleName>, TimelinePos, u32, VoiceSeeds)> {
+    let mut counts: BTreeMap<(Option<RoleName>, TimelinePos), u32> = BTreeMap::new();
     track
         .events()
         .map(|e| {
-            let lane = e.kind.lane();
-            let n = counts.entry((lane, e.anchor)).or_insert(0);
+            let role = match e.kind {
+                EventKind::Hit { hit } => {
+                    let h = &track.hits()[hit as usize];
+                    Some(track.roles()[usize::from(h.role)].clone())
+                }
+                EventKind::NoteOn { .. }
+                | EventKind::Retrigger { .. }
+                | EventKind::NoteOff { .. } => None,
+            };
+            let n = counts.entry((role.clone(), e.anchor)).or_insert(0);
             let ordinal = *n;
             *n += 1;
-            (
-                lane,
-                e.anchor,
-                ordinal,
-                tree.trigger_seeds(voice, lane, e.anchor, ordinal),
-            )
+            let group = role
+                .as_ref()
+                .map_or(TriggerGroup::Phrase, TriggerGroup::Role);
+            let seeds = tree.trigger_seeds(voice, group, e.anchor, ordinal);
+            (role, e.anchor, ordinal, seeds)
         })
         .collect()
 }

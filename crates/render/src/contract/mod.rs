@@ -125,6 +125,16 @@ pub struct BindSpec<'a> {
 /// For `span` at the take's rate, the result holds the output-rate samples
 /// from `rescale_ceil(span.start)` to `rescale_ceil(span.end)`: the samples
 /// whose time lies in the span. `None` means the take is unavailable.
+///
+/// **Position purity.** Each output sample must depend only on `(take, its
+/// absolute output index)`, never on the span it was read with. [`SliceBank`]
+/// reads each union of overlapping or touching slice spans once, so the span a
+/// slice is read with depends on its neighbours: a windowed resampler that
+/// tapers or zero-pads at the edges of the span it is given would let an
+/// inserted hit change an existing hit's slice. A resampler meets the rule by
+/// reading the take audio its kernel needs beyond the span, and treating only
+/// audio outside the take as zero. `testkit::slice_purity_violation` audits an
+/// implementation.
 pub trait SliceSource {
     fn read(&mut self, take: TakeId, span: TimelineSpan, out_rate: SampleRate) -> Option<Vec<f32>>;
 }

@@ -13,7 +13,7 @@
 | 5 | `takedown analyze` (per-frame CSV plus onset candidates); `research/eval/score.py` scoring with mir_eval | `crates/cli`, `research/eval` |
 | 6 | GitHub Actions: fmt, clippy, build, test on macOS and Windows; weekly `cargo update` canary; toolchain pinned to 1.99.1 after the first run showed CI's newer clippy | `.github/workflows/ci.yml`, `rust-toolchain.toml` |
 
-Tests: 147 test functions, most of them property tests at 128 to 256 cases (core 89, render contract 21, evidence 35, cli 2), including the four CLAUDE.md requires: exact sample-to-control mapping, block-size invariance, chunked equals monolithic, seed-tree independence. The render suite was mutation-checked against seven deliberate bugs; each was caught.
+Tests: 164 test functions, most of them property tests at 128 to 256 cases (core 101, render contract 26, evidence 35, cli 2), including the four CLAUDE.md requires: exact sample-to-control mapping, block-size invariance, chunked equals monolithic, seed-tree independence. The render suite was mutation-checked against seven deliberate bugs; each was caught, and a 5,000-case soak passes. Two independent reviews followed the build, one of the evidence crate and one of the merged core and render code; their findings are fixed (a layered hit's seed depended on its sibling's timing, newer document versions were not refused, MIDI bindings were not validated, duplicate JSON keys collapsed silently, and smaller items), each recorded in DECISIONS.md. CI is green on macOS and Windows.
 
 ## Numbers
 

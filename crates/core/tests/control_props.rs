@@ -11,11 +11,12 @@ use proptest::prelude::*;
 use proptest::test_runner::TestRunner;
 use takedown_core::canonical::RoleMap;
 use takedown_core::control::{
-    ControlFile, ControlTrack, Curve, Curves, Event, EventKind, GateSpan, HitEvent, Lane, Link,
-    MAX_HIT_MS, MAX_LEN, TrackError, TrackParts, U7, Velocity,
+    CONTROL_SCHEMA_VERSION, ControlFile, ControlTrack, Curve, Curves, Event, EventKind, GateSpan,
+    HitEvent, Lane, Link, MAX_HIT_MS, MAX_LEN, TrackError, TrackParts, U7, Velocity,
 };
 use takedown_core::hit::RoleName;
 use takedown_core::ids::{Hash32, TakeId};
+use takedown_core::migrate::{DocumentError, MigrationError};
 use takedown_core::time::{SampleRate, TimelinePos, control_index, frame_start};
 use takedown_core::views::{covered_frames, derive_key, hit_view, note_view};
 
@@ -386,12 +387,18 @@ proptest! {
         prop_assert_eq!(back.content_id(), t.content_id());
         prop_assert_eq!(t.content_id(), t.clone().content_id());
         prop_assert_eq!(serde_json::to_vec(&back).unwrap(), json);
-        let file = ControlFile { schema_version: 1, track: t };
-        let text = serde_json::to_string(&file).unwrap();
-        let back: ControlFile = serde_json::from_str(&text).unwrap();
+        let file = ControlFile::new(t);
+        let text = file.to_json();
+        let back = ControlFile::from_json(&text).unwrap();
         prop_assert_eq!(back.track.content_id(), file.track.content_id());
+        prop_assert_eq!(&back, &file);
+        prop_assert_eq!(back.to_json(), text.clone());
+        let text = String::from_utf8(text).unwrap();
         let extra = text.replacen('{', "{\"extra\":0,", 1);
-        prop_assert!(serde_json::from_str::<ControlFile>(&extra).is_err());
+        prop_assert!(matches!(
+            ControlFile::from_json(extra.as_bytes()),
+            Err(DocumentError::Json(_))
+        ));
     }
 
     #[test]
@@ -667,4 +674,63 @@ fn slice_span_clips_to_the_track() {
     assert_eq!((s.start().0, s.end().0), (980, 1_000));
     let s = t.slice_span(TimelinePos(1_000), u64::MAX).unwrap();
     assert!(s.is_empty());
+}
+
+/// `controls/*.json` reads its version first: a newer file is `TooNew`, a
+/// missing or non-integer version is never read as 0, an older one has no
+/// step yet (`Gap`), and a track that breaks an invariant is refused.
+#[test]
+fn control_file_versions_are_checked() {
+    let parts = TrackParts {
+        rate: rate(48_000),
+        len: 480,
+        take: None,
+        roles: vec![RoleName::new("kick").unwrap()],
+        curves: Curves {
+            pitch_st: vec![60.0; 2],
+            amp_db: vec![-6.0; 2],
+            bright: vec![0.5; 2],
+            breath: vec![0.0; 2],
+            vowel_x: vec![0.0; 2],
+            vowel_y: vec![0.0; 2],
+        },
+        spans: vec![],
+        hits: vec![],
+    };
+    let file = ControlFile::new(ControlTrack::new(parts).unwrap());
+    assert_eq!(file.schema_version, CONTROL_SCHEMA_VERSION);
+    let doc: serde_json::Value = serde_json::from_slice(&file.to_json()).unwrap();
+    let with = |f: &dyn Fn(&mut serde_json::Value)| {
+        let mut d = doc.clone();
+        f(&mut d);
+        ControlFile::from_json(&serde_json::to_vec(&d).unwrap())
+    };
+    assert_eq!(with(&|_| {}), Ok(file.clone()));
+    assert_eq!(
+        with(&|d| d["schema_version"] = 99.into()),
+        Err(DocumentError::Migration(MigrationError::TooNew {
+            found: 99,
+            supported: CONTROL_SCHEMA_VERSION
+        }))
+    );
+    for missing in [serde_json::Value::Null, "1".into(), (-1).into(), 1.5.into()] {
+        assert_eq!(
+            with(&|d| d["schema_version"] = missing.clone()),
+            Err(DocumentError::Migration(MigrationError::MissingVersion))
+        );
+    }
+    assert_eq!(
+        with(&|d| {
+            d.as_object_mut().unwrap().remove("schema_version");
+        }),
+        Err(DocumentError::Migration(MigrationError::MissingVersion))
+    );
+    assert_eq!(
+        with(&|d| d["schema_version"] = 0.into()),
+        Err(DocumentError::Migration(MigrationError::Gap { at: 0 }))
+    );
+    assert!(matches!(
+        with(&|d| d["track"]["len"] = 0.into()),
+        Err(DocumentError::Json(_))
+    ));
 }

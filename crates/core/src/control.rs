@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::hit::RoleName;
 use crate::ids::{ControlId, TakeId, context};
 use crate::key::{KeyError, KeyHash, KeyWriter, RawHasher};
+use crate::migrate::{self, DocumentError, Step};
 use crate::time::{
     ControlClock, SampleRate, TimelinePos, TimelineSpan, control_index, frames_covering,
 };
@@ -818,3 +819,30 @@ pub struct ControlFile {
     pub schema_version: u32,
     pub track: ControlTrack,
 }
+
+impl ControlFile {
+    /// `track` as a document of the current schema.
+    pub fn new(track: ControlTrack) -> Self {
+        Self {
+            schema_version: CONTROL_SCHEMA_VERSION,
+            track,
+        }
+    }
+
+    /// Compact and deterministic, written by [`crate::project::json`] so
+    /// every f32 reads back exactly.
+    pub fn to_json(&self) -> Vec<u8> {
+        // A track holds integers, ids, role names and finite f32s.
+        crate::project::json::to_vec(self).expect("a control file serialises")
+    }
+
+    /// Reads the version (required) -> TooNew? -> typed decode, which
+    /// validates the track. No migration step exists yet, so an older
+    /// version is a `Gap`.
+    pub fn from_json(bytes: &[u8]) -> Result<Self, DocumentError> {
+        migrate::load(bytes, CONTROL_STEPS, CONTROL_SCHEMA_VERSION).map(|(file, _)| file)
+    }
+}
+
+/// The migration chain of `controls/*.json`: empty at schema 1.
+pub const CONTROL_STEPS: &[Step] = &[];

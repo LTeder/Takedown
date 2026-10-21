@@ -7,10 +7,10 @@ use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use takedown_core::control::{ControlFrame, ControlTrack, EventKind, Lane, U7, Velocity};
+use takedown_core::control::{ControlFrame, ControlTrack, EventKind, U7, Velocity};
 use takedown_core::hit::RoleName;
 use takedown_core::ids::TakeId;
-use takedown_core::seed::VoiceSeeds;
+use takedown_core::seed::{TriggerGroup, VoiceSeeds};
 use takedown_core::time::{
     ControlClock, MIN_GAP_FRAMES, RenderPos, SampleRate, TimelinePos, TimelineSpan, control_index,
     frame_start, frames_covering, rescale_ceil, rescale_round,
@@ -152,7 +152,9 @@ pub struct BoundTrigger {
     /// onsets.
     pub lead: f32,
     pub anchor: TimelinePos,
-    /// `SeedTree::trigger_seeds(voice, lane, anchor, ordinal)`.
+    /// `SeedTree::trigger_seeds(voice, group, anchor, ordinal)`: the group is
+    /// the phrase lane or the hit's role, and the ordinal counts the earlier
+    /// events of that group at that anchor.
     pub seeds: VoiceSeeds,
     pub kind: BoundKind,
 }
@@ -450,29 +452,34 @@ fn bind_triggers(
     role_mask: u128,
 ) -> (Vec<BoundTrigger>, Vec<(u64, u64)>) {
     let (rate, out, phrase) = (track.rate(), spec.out_rate, spec.route.phrase);
-    // Ordinals count every earlier event of the track with the same (lane,
-    // anchor), routed to this voice or not, so routing never moves a seed.
-    let mut ordinals: BTreeMap<(Lane, TimelinePos), u32> = BTreeMap::new();
+    // Ordinals count every earlier event of the track in the same group (the
+    // phrase lane, or one hit role) at the same anchor, routed to this voice
+    // or not, so neither routing nor another role's timing moves a seed.
+    let mut ordinals: BTreeMap<(TriggerGroup<'_>, TimelinePos), u32> = BTreeMap::new();
     let mut triggers = Vec::new();
     let mut timeline = Vec::new();
     for e in track.events() {
-        let lane = e.kind.lane();
-        let count = ordinals.entry((lane, e.anchor)).or_insert(0);
+        let hit = match e.kind {
+            EventKind::Hit { hit } => match track.hits().get(hit as usize) {
+                Some(h) => Some(h),
+                None => continue,
+            },
+            EventKind::NoteOn { .. } | EventKind::Retrigger { .. } | EventKind::NoteOff { .. } => {
+                None
+            }
+        };
+        let group = match hit {
+            Some(h) => match track.roles().get(usize::from(h.role)) {
+                Some(name) => TriggerGroup::Role(name),
+                None => continue,
+            },
+            None => TriggerGroup::Phrase,
+        };
+        let count = ordinals.entry((group, e.anchor)).or_insert(0);
         let ordinal = *count;
         *count = count.saturating_add(1);
-        let (kind, dur) = match e.kind {
-            EventKind::NoteOn { vel, .. } if phrase => (BoundKind::NoteOn { vel, slice: None }, 0),
-            EventKind::Retrigger { vel, .. } if phrase => {
-                (BoundKind::Retrigger { vel, slice: None }, 0)
-            }
-            EventKind::NoteOff { .. } if phrase => (BoundKind::NoteOff, 0),
-            EventKind::Hit { hit } => {
-                let Some(h) = track.hits().get(hit as usize) else {
-                    continue;
-                };
-                if role_mask & role_bit(h.role) == 0 {
-                    continue;
-                }
+        let (kind, dur) = match (e.kind, hit) {
+            (EventKind::Hit { .. }, Some(h)) if role_mask & role_bit(h.role) != 0 => {
                 let kind = BoundKind::Hit {
                     role: h.role,
                     vel: h.vel,
@@ -484,9 +491,14 @@ fn bind_triggers(
                 };
                 (kind, h.dur)
             }
-            EventKind::NoteOn { .. } | EventKind::Retrigger { .. } | EventKind::NoteOff { .. } => {
-                continue;
+            (EventKind::NoteOn { vel, .. }, _) if phrase => {
+                (BoundKind::NoteOn { vel, slice: None }, 0)
             }
+            (EventKind::Retrigger { vel, .. }, _) if phrase => {
+                (BoundKind::Retrigger { vel, slice: None }, 0)
+            }
+            (EventKind::NoteOff { .. }, _) if phrase => (BoundKind::NoteOff, 0),
+            _ => continue,
         };
         let (at, lead) = rescale_ceil(e.at.0, rate, out);
         triggers.push(BoundTrigger {
@@ -495,7 +507,7 @@ fn bind_triggers(
             anchor: e.anchor,
             seeds: spec
                 .seeds
-                .trigger_seeds(spec.voice, lane, e.anchor, ordinal),
+                .trigger_seeds(spec.voice, group, e.anchor, ordinal),
             kind,
         });
         timeline.push((e.at.0, dur));

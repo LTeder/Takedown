@@ -1,6 +1,8 @@
 //! core-types §3.6: `region_reroll_locality`,
 //! `inserting_a_hit_keeps_other_seeds`, `moving_a_trigger_shifts_its_output`
-//! and `hit_voices_never_read_curves`.
+//! and `hit_voices_never_read_curves`, plus
+//! `retiming_a_layered_sibling_keeps_the_voice`: a hit's seeds count only the
+//! hits of its own role at its anchor.
 
 use std::sync::Arc;
 
@@ -460,4 +462,122 @@ proptest! {
             prop_assert_eq!(first_bit_difference(&v.mono(len), &w.mono(len)), None, "a hit voice read the curves");
         }
     }
+}
+
+/// Both voices' bound tracks agree in every trigger (seeds included),
+/// segment, end and slice, and render bit-identically.
+fn check_voice_unchanged(v: &ToyVoice, w: &ToyVoice) -> Result<(), TestCaseError> {
+    prop_assert_eq!(
+        v.bound.triggers(),
+        w.bound.triggers(),
+        "a trigger or its seeds changed"
+    );
+    prop_assert_eq!(v.bound.segments(), w.bound.segments());
+    prop_assert_eq!(v.bound.end(), w.bound.end());
+    prop_assert_eq!(v.bound.slices(), w.bound.slices());
+    let len = v.render_len().max(w.render_len());
+    prop_assert_eq!(
+        first_bit_difference(&v.mono(len), &w.mono(len)),
+        None,
+        "the voice's output changed"
+    );
+    Ok(())
+}
+
+/// A render case plus raw choices for [`retiming_a_layered_sibling_keeps_the_voice`].
+fn case_and_sibling() -> impl Strategy<Value = (RenderCase, usize, u64, u64, u64, u64)> {
+    (
+        render_case(),
+        any::<usize>(),
+        any::<u64>(),
+        1u64..=2_000,
+        1u64..=2_000,
+        any::<u64>(),
+    )
+}
+
+/// A hit of `role` at `anchor`, with `dur` and `at` clamped so it fits the
+/// track.
+fn layered(len: u64, at: u64, anchor: u64, dur: u64, role: u8, vel: u8) -> HitEvent {
+    let dur = dur.clamp(1, len);
+    hit_event(at.min(len - dur), anchor, dur, role, vel)
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(render_cases()))]
+
+    /// A voice routes role r1 but not r2. A hit of r2 layered on a hit of r1
+    /// (same anchor) moves from just before the r1 hit to just after it, and
+    /// changes its duration and velocity: the voice's triggers, seeds,
+    /// slices and output stay bit-identical.
+    #[test]
+    fn retiming_a_layered_sibling_keeps_the_voice(
+        (case, pick, raw_anchor, before_d, after_d, salt) in case_and_sibling()
+    ) {
+        let t = &case.track;
+        let n = t.roles().len();
+        // No rejections: a track with under two roles has no sibling to move.
+        if n < 2 {
+            return Ok(());
+        }
+        let len = t.len();
+        let r1 = pick % n;
+        let r2 = (r1 + 1 + (pick / n) % (n - 1)) % n;
+        let mut cfg = case.voices[0].clone();
+        cfg.roles.remove(&t.roles()[r2]);
+        cfg.roles.insert(t.roles()[r1].clone());
+        // An existing hit of r1 to layer on, or a new one.
+        let existing: Vec<HitEvent> = t.hits().iter().filter(|h| usize::from(h.role) == r1).copied().collect();
+        let mut parts = (**t).clone().into_parts();
+        let base = if existing.is_empty() || salt % 3 == 0 {
+            let anchor = raw_anchor % (len + 1);
+            let h = layered(len, anchor, anchor, 1 + salt % 4_800, r1 as u8, 100);
+            parts.hits.push(h);
+            h
+        } else {
+            existing[(raw_anchor % existing.len() as u64) as usize]
+        };
+        let cap = t.rate().samples_for_ms(MAX_HIT_MS);
+        let dur = |k: u64| 1 + (salt / 7 + k) % cap.min(len);
+        let early = layered(len, base.at.0.saturating_sub(before_d), base.anchor.0, dur(0), r2 as u8, 90);
+        let late = layered(len, base.at.0 + after_d, base.anchor.0, dur(1), r2 as u8, 30);
+        let track_with = |sibling: HitEvent| {
+            let mut p = parts.clone();
+            p.hits.push(sibling);
+            Arc::new(ControlTrack::new(p).expect("still valid"))
+        };
+        let (before, after) = (track_with(early), track_with(late));
+        let v = ToyVoice::bind(&cfg, &before, case.out_rate, &case.tree, VOICE_NAMES[0], case.max_block);
+        let w = ToyVoice::bind(&cfg, &after, case.out_rate, &case.tree, VOICE_NAMES[0], case.max_block);
+        prop_assert!(v.bound.triggers().iter().any(|g| g.anchor == base.anchor && is_hit(g)));
+        check_voice_unchanged(&v, &w)?;
+    }
+}
+
+/// The review's repro at 48 kHz: a kick and a sub layered on the onset at
+/// 4800; the sub's pre-roll moves it to 4700. A voice routing only "kick"
+/// keeps its trigger seeds, its slices and its output, bit for bit.
+#[test]
+fn moving_a_layered_sub_keeps_the_kick_voice() {
+    let r = rate(48_000);
+    let track = |sub_at: u64| {
+        Arc::new(fixed_track(
+            r,
+            48_000,
+            &["kick", "sub"],
+            vec![],
+            vec![
+                hit_event(4_800, 4_800, 4_800, 0, 110),
+                hit_event(sub_at, 4_800, 9_600, 1, 100),
+            ],
+            true,
+        ))
+    };
+    let tree = SeedTree::new(Seed(0x5eed_0f5a));
+    let mut cfg = ToyConfig::hits(&["kick"]);
+    cfg.slice_max_ms = 30;
+    let v = ToyVoice::bind(&cfg, &track(4_800), r, &tree, "kit", 256);
+    let w = ToyVoice::bind(&cfg, &track(4_700), r, &tree, "kit", 256);
+    assert_eq!(v.bound.triggers().len(), 1);
+    check_voice_unchanged(&v, &w).expect("the kick is untouched by the sub's move");
 }

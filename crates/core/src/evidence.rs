@@ -41,7 +41,9 @@ pub const CANONICAL_NAN_BITS: u32 = 0x7FC0_0000;
 pub struct Provenance {
     pub analyzer: String,
     pub version: u32,
+    #[serde(deserialize_with = "crate::strict::map")]
     pub models: BTreeMap<String, Hash32>,
+    #[serde(deserialize_with = "crate::strict::map")]
     pub params: Params,
 }
 

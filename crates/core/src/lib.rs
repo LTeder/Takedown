@@ -20,6 +20,7 @@ pub mod musical;
 pub mod params;
 pub mod project;
 pub mod seed;
+pub mod strict;
 pub mod take;
 pub mod time;
 pub mod views;

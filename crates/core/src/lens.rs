@@ -93,6 +93,7 @@ pub struct LensSettings {
     pub palette: PaletteRef,
     pub sliders: Sliders,
     /// Outside keys.
+    #[serde(deserialize_with = "crate::strict::set")]
     pub locks: BTreeSet<Slider>,
 }
 

@@ -12,7 +12,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::canonical::MidiBinding;
+use crate::canonical::{MidiBinding, MpeProfileError};
 use crate::control::ControlTrack;
 use crate::edit::EditEntry;
 use crate::evidence::EvidenceHeader;
@@ -71,6 +71,8 @@ pub enum InterpError {
     Lens(LensError),
     Seeds(SeedError),
     Key(KeyError),
+    /// A MIDI binding that no MPE file could carry.
+    Midi(MpeProfileError),
 }
 
 impl fmt::Display for InterpError {
@@ -83,6 +85,7 @@ impl fmt::Display for InterpError {
             Self::Lens(e) => write!(f, "lens settings: {e}"),
             Self::Seeds(e) => write!(f, "seed tree: {e}"),
             Self::Key(e) => write!(f, "key: {e}"),
+            Self::Midi(e) => write!(f, "MIDI binding: {e}"),
         }
     }
 }
@@ -157,8 +160,8 @@ impl Interpretation {
     }
 
     /// A Lens source needs a take; every take named must be in `takes`; lens
-    /// settings and seeds must be valid; the key must be computable (every
-    /// keyed float finite).
+    /// settings, seeds and the MIDI binding must be valid; the key must be
+    /// computable (every keyed float finite).
     ///
     /// The evidence take and an imported track's rate live outside the
     /// project document, so their checks are [`check_evidence`] and
@@ -177,6 +180,7 @@ impl Interpretation {
         }
         self.lens.validate().map_err(InterpError::Lens)?;
         self.seeds.validate().map_err(InterpError::Seeds)?;
+        self.midi.validate().map_err(InterpError::Midi)?;
         self.key().map_err(InterpError::Key)?;
         Ok(())
     }

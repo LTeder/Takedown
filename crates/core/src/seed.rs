@@ -10,6 +10,7 @@ use std::fmt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::control::Lane;
+use crate::hit::RoleName;
 use crate::ids::{HexVisitor, context, encode_hex};
 use crate::key::{KeyError, KeyHash, KeyWriter};
 use crate::time::{TimelinePos, TimelineSpan};
@@ -200,8 +201,10 @@ pub struct SeedTree {
     /// Supplied by app.
     pub root: Seed,
     /// A missing entry means 0; zero entries are removed.
+    #[serde(deserialize_with = "crate::strict::map")]
     pub rolls: BTreeMap<Aspect, u32>,
     /// The dice skip these. Outside keys.
+    #[serde(deserialize_with = "crate::strict::set")]
     pub locked: BTreeSet<Aspect>,
     /// Sorted by (aspect, span), at most one entry per (aspect, span), no zero rolls.
     pub regions: Vec<RegionRoll>,
@@ -212,6 +215,25 @@ pub struct SeedTree {
 pub struct VoiceSeeds {
     pub body: Seed,
     pub mangle: Seed,
+}
+
+/// The events a trigger's ordinal counts among, at one anchor: the phrase
+/// lane, or the hits of one role. Hits of different roles never share a
+/// group, so moving a layered hit cannot re-roll a sibling of another role.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TriggerGroup<'a> {
+    Phrase,
+    Role(&'a RoleName),
+}
+
+impl TriggerGroup<'_> {
+    /// The lane the group belongs to.
+    pub const fn lane(self) -> Lane {
+        match self {
+            Self::Phrase => Lane::Phrase,
+            Self::Role(_) => Lane::Hits,
+        }
+    }
 }
 
 /// A SeedTree that breaks its invariants.
@@ -345,21 +367,33 @@ impl SeedTree {
         }
     }
 
-    /// `aspect_at(Body | Mangle, anchor).derive(voice, 0).derive(lane label,
-    /// anchor).derive("ordinal", ordinal)`. `ordinal` counts the earlier events
-    /// with the same (lane, anchor) in canonical order.
+    /// The seeds of one trigger:
+    /// - phrase: `aspect_at(Body | Mangle, anchor).derive(voice, 0)
+    ///   .derive("lane/phrase", anchor).derive("ordinal", ordinal)`;
+    /// - hit: `aspect_at(Body | Mangle, anchor).derive(voice, 0)
+    ///   .derive("lane/hits", anchor).derive(role, 0).derive("ordinal", ordinal)`.
+    ///
+    /// `ordinal` counts the earlier events of the same [`TriggerGroup`] at
+    /// the same anchor in canonical order. A hit's seeds therefore never
+    /// depend on hits of other roles, and depend on its own `at` only
+    /// through its order among hits of its role at its anchor.
     pub fn trigger_seeds(
         &self,
         voice: &str,
-        lane: Lane,
+        group: TriggerGroup<'_>,
         anchor: TimelinePos,
         ordinal: u32,
     ) -> VoiceSeeds {
         let per_event = |a: Aspect| {
-            self.aspect_at(a, anchor)
+            let lane = self
+                .aspect_at(a, anchor)
                 .derive(voice, 0)
-                .derive(lane.label(), anchor.0)
-                .derive("ordinal", u64::from(ordinal))
+                .derive(group.lane().label(), anchor.0);
+            let group_seed = match group {
+                TriggerGroup::Phrase => lane,
+                TriggerGroup::Role(role) => lane.derive(role.as_str(), 0),
+            };
+            group_seed.derive("ordinal", u64::from(ordinal))
         };
         VoiceSeeds {
             body: per_event(Aspect::Body),

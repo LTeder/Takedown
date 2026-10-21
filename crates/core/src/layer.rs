@@ -103,6 +103,7 @@ pub struct Layer {
     pub interp: InterpId,
     pub gain_db: f32,
     pub mute: bool,
+    #[serde(deserialize_with = "crate::strict::map")]
     pub renders: BTreeMap<SampleRate, RenderRef>,
 }
 

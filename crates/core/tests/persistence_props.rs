@@ -16,14 +16,17 @@ use proptest::prelude::*;
 use proptest::sample::select;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use takedown_core::canonical::{MidiBinding, MpeProfile};
+use takedown_core::canonical::{MidiBinding, MpeProfile, MpeProfileError};
 use takedown_core::control::Velocity;
 use takedown_core::edit::{Articulation, Edit, EditEntry};
 use takedown_core::evidence::{
     CANONICAL_NAN_BITS, CONTAINER_VERSION, Column, Evidence, EvidenceError, EvidenceHeader,
     EvidenceResolution, OnsetCandidate, Provenance, resolve_evidence,
 };
-use takedown_core::hit::{HitAnchor, RoleName};
+use takedown_core::hit::{
+    ClassifierStamp, HIT_CACHE_VERSION, Hit, HitAnchor, HitCacheError, HitCacheFile, HitSet,
+    RoleName, TEACH_SCHEMA_VERSION, TeachFile, TeachLabel, TeachSet,
+};
 use takedown_core::ids::{
     ControlId, EditId, EvidenceKey, Hash32, HitSetKey, InterpId, InterpKey, LayerId, MidiFileId,
     PaletteId, ProjectId, TakeId, TeachSetId, WavId, context,
@@ -34,7 +37,7 @@ use takedown_core::layer::{
     BackendStamp, Layer, LayerStatus, PlatformClass, RenderInputs, RenderRef, StaleReason,
 };
 use takedown_core::lens::{LensError, LensSettings, PaletteRef, Slider, Sliders};
-use takedown_core::migrate::{self, MigrationError, Step, chain_is_total};
+use takedown_core::migrate::{self, DocumentError, MigrationError, Step, chain_is_total};
 use takedown_core::musical::{TempoMap, TempoSegment, TimeMap};
 use takedown_core::params::{ParamValue, Params};
 use takedown_core::project::{
@@ -174,7 +177,7 @@ fn scenario_project() -> Project {
             name: "grit".to_owned(),
         },
     );
-    let id = InterpId(p.alloc_id());
+    let id = InterpId(p.alloc_id().unwrap());
     let mut edits = Vec::new();
     for edit in [
         Edit::ForcePitch {
@@ -196,7 +199,7 @@ fn scenario_project() -> Project {
         },
     ] {
         edits.push(EditEntry {
-            id: EditId(p.alloc_id()),
+            id: EditId(p.alloc_id().unwrap()),
             edit,
         });
     }
@@ -233,7 +236,7 @@ fn scenario_project() -> Project {
     let inputs = current_inputs(&interp, r48);
     p.interpretations.push(interp);
     let mut layer = Layer {
-        id: LayerId(p.alloc_id()),
+        id: LayerId(p.alloc_id().unwrap()),
         interp: id,
         gain_db: -3.0,
         mute: false,
@@ -667,7 +670,7 @@ fn build_project(
         .collect();
     p.teach_set = teach.map(TeachSetId::from_hash);
     for plan in interps {
-        let id = InterpId(p.alloc_id());
+        let id = InterpId(p.alloc_id().unwrap());
         let take_id = take_ids[plan.take % take_ids.len()];
         let (take, source) = if let Some((control, file, with_take)) = plan.imported {
             (
@@ -682,7 +685,7 @@ fn build_project(
                 .edits
                 .into_iter()
                 .map(|edit| EditEntry {
-                    id: EditId(p.alloc_id()),
+                    id: EditId(p.alloc_id().unwrap()),
                     edit,
                 })
                 .collect();
@@ -711,7 +714,13 @@ fn build_project(
         let key = interp.key().unwrap();
         p.interpretations.push(interp);
         if let Some(lp) = plan.layer {
-            let layer = build_layer(LayerId(p.alloc_id()), id, key, &lp, [out_rate, second_rate]);
+            let layer = build_layer(
+                LayerId(p.alloc_id().unwrap()),
+                id,
+                key,
+                &lp,
+                [out_rate, second_rate],
+            );
             p.layers.push(layer);
         }
     }
@@ -1531,6 +1540,250 @@ fn newer_and_missing_schema_refused() {
     );
 }
 
+/// The hit cache reads its container version before anything else: under
+/// any other version, older or newer, the file is a cache miss and is never
+/// decoded.
+#[test]
+fn hit_cache_files_check_versions() {
+    let key = HitSetKey::from_hash(Hash32([3; 32]));
+    let set = HitSet {
+        key,
+        roles: vec![role("kick"), role("snare")],
+        hits: vec![Hit {
+            onset: TimelinePos(4_800),
+            span: span(4_800, 9_600),
+            loudness_db: -12.5,
+            brightness: 0.25,
+            decay_db_per_s: -30.0,
+            scores: vec![0.75, 0.25],
+        }],
+    };
+    let text = HitCacheFile::new(set.clone()).to_json();
+    assert_eq!(HitCacheFile::from_json(&text, key), Ok(set.clone()));
+    assert_eq!(
+        HitCacheFile::from_json(&text, HitSetKey::from_hash(Hash32([4; 32]))),
+        Err(HitCacheError::KeyMismatch),
+        "another key's set is never a substitute"
+    );
+    let doc: Value = serde_json::from_slice(&text).unwrap();
+    let cache = |f: &dyn Fn(&mut Value)| {
+        let mut d = doc.clone();
+        f(&mut d);
+        HitCacheFile::from_json(&to_bytes(&d), key)
+    };
+    for found in [0, HIT_CACHE_VERSION + 1, u32::MAX] {
+        assert_eq!(
+            cache(&|d| d["container_version"] = found.into()),
+            Err(HitCacheError::VersionMismatch {
+                found,
+                supported: HIT_CACHE_VERSION
+            })
+        );
+    }
+    // A newer layout this build cannot decode is still only a version miss.
+    assert_eq!(
+        cache(&|d| {
+            d["container_version"] = 2.into();
+            d["set"] = Value::from("a future layout");
+        }),
+        Err(HitCacheError::VersionMismatch {
+            found: 2,
+            supported: HIT_CACHE_VERSION
+        })
+    );
+    for missing in [Value::Null, Value::from("1"), Value::from(-1)] {
+        assert_eq!(
+            cache(&|d| d["container_version"] = missing.clone()),
+            Err(HitCacheError::MissingVersion)
+        );
+    }
+    assert_eq!(
+        cache(&|d| {
+            d.as_object_mut().unwrap().remove("container_version");
+        }),
+        Err(HitCacheError::MissingVersion)
+    );
+    assert!(matches!(
+        cache(&|d| d["set"]["extra"] = 1.into()),
+        Err(HitCacheError::Json(_))
+    ));
+    assert!(matches!(
+        HitCacheFile::from_json(b"{", key),
+        Err(HitCacheError::Json(_))
+    ));
+}
+
+/// A teach file follows the project's rules: `TooNew`, `MissingVersion`
+/// (never 0), a `Gap` below the current version; its labels are a set.
+#[test]
+fn teach_files_check_versions() {
+    let label = |at: u64, name: &str| TeachLabel {
+        take: TakeId::from_hash(Hash32([1; 32])),
+        at: TimelinePos(at),
+        role: role(name),
+    };
+    let teach = TeachFile::new(TeachSet {
+        labels: vec![label(44_100, "kick"), label(66_150, "snare")],
+    });
+    assert_eq!(teach.schema_version, TEACH_SCHEMA_VERSION);
+    let text = teach.to_json();
+    assert_eq!(TeachFile::from_json(&text), Ok(teach.clone()));
+    let doc: Value = serde_json::from_slice(&text).unwrap();
+    let load = |f: &dyn Fn(&mut Value)| {
+        let mut d = doc.clone();
+        f(&mut d);
+        TeachFile::from_json(&to_bytes(&d))
+    };
+    assert_eq!(
+        load(&|d| d["schema_version"] = 99.into()),
+        Err(DocumentError::Migration(MigrationError::TooNew {
+            found: 99,
+            supported: TEACH_SCHEMA_VERSION
+        }))
+    );
+    assert_eq!(
+        load(&|d| {
+            d.as_object_mut().unwrap().remove("schema_version");
+        }),
+        Err(DocumentError::Migration(MigrationError::MissingVersion))
+    );
+    assert_eq!(
+        load(&|d| d["schema_version"] = 0.into()),
+        Err(DocumentError::Migration(MigrationError::Gap { at: 0 }))
+    );
+    // The labels are a set.
+    assert_eq!(
+        load(&|d| {
+            let first = d["set"]["labels"][0].clone();
+            d["set"]["labels"].as_array_mut().unwrap().push(first);
+        }),
+        Err(DocumentError::Key(KeyError::DuplicateKey))
+    );
+    assert!(matches!(
+        load(&|d| d["set"]["labels"][0]["extra"] = 1.into()),
+        Err(DocumentError::Json(_))
+    ));
+}
+
+fn k(name: &str) -> Seg {
+    Seg::Key(name.to_owned())
+}
+
+/// The text of `doc` with the first key of the object at `path` written a
+/// second time, holding `value`. (A `Value` cannot hold a repeated key, so
+/// the repeat is spliced into the text.)
+fn with_repeated_key(doc: &Value, path: &[Seg], value: Option<Value>) -> Vec<u8> {
+    const MARK: &str = "zz_repeat_of_the_first_key";
+    let mut d = doc.clone();
+    let Value::Object(map) = at_mut(&mut d, path) else {
+        panic!("no object at {path:?}")
+    };
+    let (first, first_value) = map.iter().next().expect("a non-empty map");
+    let (first, value) = (first.clone(), value.unwrap_or_else(|| first_value.clone()));
+    map.insert(MARK.to_owned(), value);
+    let text = String::from_utf8(to_bytes(&d)).unwrap();
+    assert_eq!(text.matches(MARK).count(), 1);
+    let key = serde_json::to_string(&first).unwrap();
+    text.replace(&format!("\"{MARK}\""), &key).into_bytes()
+}
+
+/// Every persisted map refuses a repeated key and every persisted set a
+/// repeated element, with the same value or another, instead of keeping one
+/// silently. The JSON key compares after unescaping.
+#[test]
+fn duplicate_map_keys_and_set_elements_refused() {
+    let doc: Value = serde_json::from_str(PROJECT_V1).unwrap();
+    let refused = |bytes: &[u8], what: &str| match Project::from_json(bytes) {
+        Err(ProjectError::Json(m)) if m.contains("duplicate") => {}
+        other => panic!("a repeated {what} loaded: {other:?}"),
+    };
+    let interp = |rest: &[&str]| {
+        let mut path = vec![k("interpretations"), Seg::Index(0)];
+        path.extend(rest.iter().map(|s| k(s)));
+        path
+    };
+    let maps = [
+        ("take", vec![k("takes")]),
+        ("palette", vec![k("palettes")]),
+        ("roll", interp(&["seeds", "rolls"])),
+        ("role key", interp(&["midi", "profile", "roles", "keys"])),
+        (
+            "render rate",
+            vec![k("layers"), Seg::Index(0), k("renders")],
+        ),
+    ];
+    for (what, path) in &maps {
+        refused(&with_repeated_key(&doc, path, None), what);
+    }
+    refused(
+        &with_repeated_key(&doc, &interp(&["seeds", "rolls"]), Some(7.into())),
+        "roll with another count",
+    );
+    for (what, path) in [
+        ("aspect lock", interp(&["seeds", "locked"])),
+        ("slider lock", interp(&["lens", "locks"])),
+    ] {
+        let mut d = doc.clone();
+        let set = at_mut(&mut d, &path).as_array_mut().unwrap();
+        set.push(set[0].clone());
+        refused(&to_bytes(&d), what);
+    }
+
+    // The review's example, and an escaped repeat.
+    let tree = |rolls: &str| {
+        serde_json::from_str::<SeedTree>(&format!(
+            r#"{{"root":"0000000000000001","rolls":{rolls},"locked":[],"regions":[]}}"#
+        ))
+    };
+    assert!(tree(r#"{"body":1,"mangle":2}"#).is_ok());
+    for rolls in [r#"{"body":1,"body":2}"#, r#"{"body":1,"\u0062ody":1}"#] {
+        let err = tree(rolls).unwrap_err().to_string();
+        assert!(err.contains("duplicate map key Body"), "{rolls}: {err}");
+    }
+    let hash = "ab".repeat(32);
+    let provenance = |models: &str, params: &str| {
+        serde_json::from_str::<Provenance>(&format!(
+            r#"{{"analyzer":"a","version":1,"models":{models},"params":{params}}}"#
+        ))
+    };
+    assert!(provenance(&format!(r#"{{"m":"{hash}"}}"#), r#"{"w":1}"#).is_ok());
+    assert!(provenance(&format!(r#"{{"m":"{hash}","m":"{hash}"}}"#), "{}").is_err());
+    assert!(provenance("{}", r#"{"w":1,"w":2.5}"#).is_err());
+    let stamp = |params: &str| {
+        serde_json::from_str::<ClassifierStamp>(&format!(
+            r#"{{"id":"knn","version":1,"params":{params}}}"#
+        ))
+    };
+    assert!(stamp(r#"{"k":3}"#).is_ok());
+    assert!(stamp(r#"{"k":3,"k":3}"#).is_err());
+
+    // A migrated document passes through a `Value`, which would keep only
+    // the last of two keys: its original text is checked first.
+    let v1 = as_v1(&scenario_project(), false);
+    assert!(Project::from_json_with(&v1, &[ADD_GLIDE], 2).is_ok());
+    let v1_doc: Value = serde_json::from_slice(&v1).unwrap();
+    let repeated = with_repeated_key(&v1_doc, &[k("takes")], None);
+    match Project::from_json_with(&repeated, &[ADD_GLIDE], 2) {
+        Err(ProjectError::Json(m)) if m.contains("duplicate") => {}
+        other => panic!("a migrated document kept a repeated key: {other:?}"),
+    }
+}
+
+/// `alloc_id` never panics: a project whose id space is used up is still
+/// valid and loads, but cannot grow.
+#[test]
+fn alloc_id_reports_exhaustion() {
+    let mut p = scenario_project();
+    p.next_id = u32::MAX - 1;
+    assert_eq!(p.validate(), Ok(()));
+    assert_eq!(p.alloc_id(), Ok(u32::MAX - 1));
+    assert_eq!(p.next_id, u32::MAX);
+    assert_eq!(p.validate(), Ok(()));
+    let mut q = Project::from_json(&p.to_json()).unwrap().project;
+    assert_eq!(q.alloc_id(), Err(ProjectError::IdsExhausted));
+    assert_eq!(q.next_id, u32::MAX, "a failed allocation changes nothing");
+}
+
 fn sliders_mut(doc: &mut Value) -> Vec<&mut Map<String, Value>> {
     doc["interpretations"]
         .as_array_mut()
@@ -2253,13 +2506,13 @@ fn sample_rate_change_mid_project() {
     let take96_id = take96.id;
     assert_eq!(p.add_take(take96), TakeAdded::New);
     let mut interp96 = p.interpretations[0].clone();
-    interp96.id = InterpId(p.alloc_id());
+    interp96.id = InterpId(p.alloc_id().unwrap());
     interp96.take = Some(take96_id);
     interp96.source = ControlSource::Lens {
         evidence: EvidenceKey::from_hash(Hash32([0x96; 32])),
         hits: None,
         edits: vec![EditEntry {
-            id: EditId(p.alloc_id()),
+            id: EditId(p.alloc_id().unwrap()),
             edit: Edit::SplitAt {
                 at: TimelinePos(4_800),
                 articulation: Articulation::Retrigger,
@@ -2439,7 +2692,7 @@ fn render_files_are_content_addressed() {
     p.layers[0].renders.clear();
     p.layers[0].store_render(r1.clone());
     let mut second = p.layers[0].clone();
-    second.id = LayerId(p.alloc_id());
+    second.id = LayerId(p.alloc_id().unwrap());
     second.renders.clear();
     second.store_render(r2.clone());
     p.layers.push(second);
@@ -2591,6 +2844,14 @@ fn validate_refuses_broken_projects() {
     check(
         &|q| q.interpretations[0].take = None,
         ProjectError::Interp(iid, InterpError::MissingTake),
+    );
+    check(
+        &|q| q.interpretations[0].midi.profile.hit_channels = (3, 15),
+        ProjectError::Interp(iid, InterpError::Midi(MpeProfileError::LanesOverlap)),
+    );
+    check(
+        &|q| q.interpretations[0].midi.profile.bend_range_st = 0,
+        ProjectError::Interp(iid, InterpError::Midi(MpeProfileError::BendRange(0))),
     );
     check(
         &|q| q.interpretations[0].lens.sliders.glide_retrigger = 1.5,

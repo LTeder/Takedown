@@ -9,11 +9,23 @@ use common::{
 };
 use proptest::collection::vec;
 use proptest::prelude::*;
-use takedown_core::control::{ControlTrack, HitEvent, Lane, U7, Velocity};
-use takedown_core::seed::{Aspect, RegionRoll, Seed, SeedTree};
+use takedown_core::control::{ControlTrack, Curves, EventKind, HitEvent, TrackParts, U7, Velocity};
+use takedown_core::hit::RoleName;
+use takedown_core::seed::{Aspect, RegionRoll, Seed, SeedTree, TriggerGroup, VoiceSeeds};
 use takedown_core::time::{TimelinePos, TimelineSpan};
 
 const VOICES: [&str; 2] = ["kit/kick_body", "texture"];
+
+fn role(name: &str) -> RoleName {
+    RoleName::new(name).expect("a valid role name")
+}
+
+/// The phrase lane and two hit roles: every kind of trigger group.
+fn groups(roles: &[RoleName]) -> Vec<TriggerGroup<'_>> {
+    std::iter::once(TriggerGroup::Phrase)
+        .chain(roles.iter().map(TriggerGroup::Role))
+        .collect()
+}
 
 /// Everything observable that derives from aspect `a`, at the given anchors.
 fn fingerprint(t: &SeedTree, a: Aspect, anchors: &[TimelinePos]) -> Vec<u64> {
@@ -26,12 +38,13 @@ fn fingerprint(t: &SeedTree, a: Aspect, anchors: &[TimelinePos]) -> Vec<u64> {
         Aspect::Mangle => Some(s.mangle.0),
         _ => None,
     };
+    let roles = [role("kick"), role("sub")];
     for v in VOICES {
         out.extend(pick(t.voice_seeds(v)));
         for at in anchors {
-            for lane in [Lane::Phrase, Lane::Hits] {
+            for group in groups(&roles) {
                 for ordinal in 0..2 {
-                    out.extend(pick(t.trigger_seeds(v, lane, *at, ordinal)));
+                    out.extend(pick(t.trigger_seeds(v, group, *at, ordinal)));
                 }
             }
         }
@@ -171,10 +184,11 @@ proptest! {
                 let moved = t.aspect_at(b, *at) != before.aspect_at(b, *at);
                 prop_assert_eq!(moved, b == a && span.contains(*at), "aspect {:?} at {}", b, at.0);
             }
+            let roles = [role("kick"), role("sub")];
             for v in VOICES {
-                for lane in [Lane::Phrase, Lane::Hits] {
-                    let x = t.trigger_seeds(v, lane, *at, 0);
-                    let y = before.trigger_seeds(v, lane, *at, 0);
+                for group in groups(&roles) {
+                    let x = t.trigger_seeds(v, group, *at, 0);
+                    let y = before.trigger_seeds(v, group, *at, 0);
                     let inside = span.contains(*at);
                     prop_assert_eq!(x.body != y.body, a == Aspect::Body && inside);
                     prop_assert_eq!(x.mangle != y.mangle, a == Aspect::Mangle && inside);
@@ -227,12 +241,12 @@ proptest! {
                 });
             }
         } else if !parts.hits.is_empty() {
-            // Remove a hit that is alone at its anchor.
+            // Remove a hit that is alone in its (role, anchor) group.
             let i = (salt % parts.hits.len() as u64) as usize;
-            let anchor = parts.hits[i].anchor;
-            if parts.hits.iter().filter(|h| h.anchor == anchor).count() == 1 {
+            let (anchor, r) = (parts.hits[i].anchor, parts.hits[i].role);
+            if parts.hits.iter().filter(|h| h.anchor == anchor && h.role == r).count() == 1 {
+                removed = Some((Some(parts.roles[usize::from(r)].clone()), anchor));
                 parts.hits.remove(i);
-                removed = Some((Lane::Hits, anchor));
             }
         }
         let edited = ControlTrack::new(parts).unwrap();
@@ -240,11 +254,11 @@ proptest! {
             .into_iter()
             .map(|(l, a, o, s)| ((l, a, o), s))
             .collect();
-        for (lane, anchor, ordinal, seeds) in base {
-            if removed == Some((lane, anchor)) {
+        for (group, anchor, ordinal, seeds) in base {
+            if removed.as_ref() == Some(&(group.clone(), anchor)) {
                 continue;
             }
-            prop_assert_eq!(after.get(&(lane, anchor, ordinal)), Some(&seeds));
+            prop_assert_eq!(after.get(&(group, anchor, ordinal)), Some(&seeds));
         }
     }
 
@@ -254,12 +268,15 @@ proptest! {
         anchor in 0u64..3_000,
         n in 2u32..=3,
     ) {
+        // Layered hits of distinct roles, repeats of one role, and the
+        // phrase lane: every (voice, group, ordinal) gets its own seeds.
+        let roles = [role("kick"), role("sub"), role("snare")];
         let mut body = HashSet::new();
         let mut mangle = HashSet::new();
         for v in VOICES {
-            for lane in [Lane::Phrase, Lane::Hits] {
+            for group in groups(&roles) {
                 for ordinal in 0..n {
-                    let s = tree.trigger_seeds(v, lane, TimelinePos(anchor), ordinal);
+                    let s = tree.trigger_seeds(v, group, TimelinePos(anchor), ordinal);
                     prop_assert!(body.insert(s.body));
                     prop_assert!(mangle.insert(s.mangle));
                 }
@@ -352,6 +369,151 @@ proptest! {
     }
 }
 
+/// Per (group, anchor), the events in canonical order: the hit (`None` for
+/// a phrase event) and its seeds.
+type Groups = BTreeMap<(Option<RoleName>, TimelinePos), Vec<(Option<HitEvent>, VoiceSeeds)>>;
+
+fn groups_of(track: &ControlTrack, tree: &SeedTree, voice: &str) -> Groups {
+    let mut out = Groups::new();
+    for (e, (group, anchor, _, seeds)) in track.events().zip(event_seeds(track, tree, voice)) {
+        let hit = match e.kind {
+            EventKind::Hit { hit } => Some(track.hits()[hit as usize]),
+            EventKind::NoteOn { .. } | EventKind::Retrigger { .. } | EventKind::NoteOff { .. } => {
+                None
+            }
+        };
+        out.entry((group, anchor)).or_default().push((hit, seeds));
+    }
+    out
+}
+
+/// A track, a seed tree, a hit to move (preferring one layered with another
+/// role at its anchor) and where to move it: just before or just after a
+/// sibling, or anywhere.
+fn retime(track: &ControlTrack, salt: u64, to: u64) -> Option<(usize, ControlTrack)> {
+    let hits = track.hits();
+    if hits.is_empty() {
+        return None;
+    }
+    let siblings = |i: usize| -> Vec<u64> {
+        hits.iter()
+            .filter(|h| h.anchor == hits[i].anchor && h.role != hits[i].role)
+            .map(|h| h.at.0)
+            .collect()
+    };
+    let layered: Vec<usize> = (0..hits.len())
+        .filter(|&i| !siblings(i).is_empty())
+        .collect();
+    let i = if layered.is_empty() {
+        (salt % hits.len() as u64) as usize
+    } else {
+        layered[(salt % layered.len() as u64) as usize]
+    };
+    let room = track.len() - hits[i].dur;
+    let near = siblings(i);
+    let wanted = match (to % 3, near.is_empty()) {
+        (0, false) => near[((to / 3) % near.len() as u64) as usize].saturating_sub(1),
+        (1, false) => near[((to / 3) % near.len() as u64) as usize] + 1,
+        _ => (to / 3) % (room + 1),
+    };
+    let mut parts = track.clone().into_parts();
+    parts.hits[i].at = TimelinePos(wanted.min(room));
+    Some((
+        i,
+        ControlTrack::new(parts).expect("a retimed hit stays valid"),
+    ))
+}
+
+proptest! {
+    /// Moving one hit's `at` (pre-roll, timing feel, a Reaper nudge) leaves
+    /// the seeds of every other (role, anchor) group untouched, so a layered
+    /// sibling of another role never re-rolls. The moved hit keeps its own
+    /// seeds when it is alone in its group.
+    #[test]
+    fn retiming_a_hit_keeps_other_roles_seeds(
+        (track, tree, salt) in track_tree(),
+        to in any::<u64>(),
+    ) {
+        let Some((i, edited)) = retime(&track, salt, to) else {
+            return Ok(());
+        };
+        let moved = track.hits()[i];
+        let own = (Some(track.roles()[usize::from(moved.role)].clone()), moved.anchor);
+        for v in VOICES {
+            let before = groups_of(&track, &tree, v);
+            let after = groups_of(&edited, &tree, v);
+            prop_assert_eq!(before.keys().collect::<Vec<_>>(), after.keys().collect::<Vec<_>>());
+            for (key, events) in &before {
+                if *key == own {
+                    if events.len() == 1 {
+                        prop_assert_eq!(after[key][0].1, events[0].1, "a lone hit's seeds followed its at");
+                    }
+                    continue;
+                }
+                prop_assert_eq!(&after[key], events, "group {:?} changed when another hit moved", key);
+            }
+        }
+    }
+}
+
+/// The review's repro: a kick and a sub layered on one onset at 48 kHz. The
+/// sub's pre-roll moves it 100 samples earlier; the kick keeps its seeds, and
+/// the two roles never share seeds.
+#[test]
+fn moving_a_layered_sub_keeps_the_kick() {
+    let r = takedown_core::time::SampleRate::new(48_000).unwrap();
+    let len = 48_000;
+    let frames = takedown_core::time::frames_covering(len, r) as usize;
+    let flat = |v: f32| vec![v; frames];
+    let hit = |at: u64, role: u8| HitEvent {
+        at: TimelinePos(at),
+        anchor: TimelinePos(4_800),
+        dur: 2_400,
+        role,
+        vel: Velocity::new(100).unwrap(),
+        bright: U7::new(64).unwrap(),
+        breath: U7::new(0).unwrap(),
+        mouth: U7::new(0).unwrap(),
+    };
+    let track = |sub_at: u64| {
+        ControlTrack::new(TrackParts {
+            rate: r,
+            len,
+            take: None,
+            roles: vec![role("kick"), role("sub")],
+            curves: Curves {
+                pitch_st: flat(60.0),
+                amp_db: flat(-6.0),
+                bright: flat(0.5),
+                breath: flat(0.0),
+                vowel_x: flat(0.0),
+                vowel_y: flat(0.0),
+            },
+            spans: vec![],
+            hits: vec![hit(4_800, 0), hit(sub_at, 1)],
+        })
+        .unwrap()
+    };
+    let tree = SeedTree::new(Seed(0x5eed));
+    let kick_of = |t: &ControlTrack| {
+        event_seeds(t, &tree, VOICES[0])
+            .into_iter()
+            .find(|e| e.0 == Some(role("kick")))
+            .unwrap()
+    };
+    let sub_of = |t: &ControlTrack| {
+        event_seeds(t, &tree, VOICES[0])
+            .into_iter()
+            .find(|e| e.0 == Some(role("sub")))
+            .unwrap()
+    };
+    let (together, moved) = (track(4_800), track(4_700));
+    assert_eq!(kick_of(&together), kick_of(&moved));
+    assert_eq!(sub_of(&together), sub_of(&moved));
+    assert_eq!(kick_of(&together).2, 0);
+    assert_ne!(kick_of(&together).3, sub_of(&together).3);
+}
+
 /// The frozen tree used by the fixture.
 fn frozen_tree() -> SeedTree {
     let mut t = SeedTree::new(Seed(0x0123_4567_89AB_CDEF));
@@ -395,9 +557,23 @@ fn frozen_seeds_and_noise() {
     let v = t.voice_seeds("kit/kick_body");
     put("tree/voice/body", v.body.to_string());
     put("tree/voice/mangle", v.mangle.to_string());
-    let tr = t.trigger_seeds("kit/kick_body", Lane::Hits, TimelinePos(60_000), 1);
-    put("tree/trigger/body", tr.body.to_string());
-    put("tree/trigger/mangle", tr.mangle.to_string());
+    let phrase = t.trigger_seeds(
+        "kit/kick_body",
+        TriggerGroup::Phrase,
+        TimelinePos(60_000),
+        1,
+    );
+    put("tree/trigger/phrase/body", phrase.body.to_string());
+    put("tree/trigger/phrase/mangle", phrase.mangle.to_string());
+    let kick = role("kick");
+    let hit = t.trigger_seeds(
+        "kit/kick_body",
+        TriggerGroup::Role(&kick),
+        TimelinePos(60_000),
+        1,
+    );
+    put("tree/trigger/hits/kick/body", hit.body.to_string());
+    put("tree/trigger/hits/kick/mangle", hit.mangle.to_string());
     let ns = Seed(0xDEAD_BEEF).noise(3);
     for n in [0u64, 1, 2, 1 << 40, u64::MAX] {
         put(&format!("noise/u64/{n}"), format!("{:016x}", ns.u64_at(n)));

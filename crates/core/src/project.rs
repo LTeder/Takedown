@@ -25,7 +25,7 @@ use crate::ids::{InterpId, LayerId, PaletteId, ProjectId, TakeId, TeachSetId};
 use crate::interp::{ControlSource, InterpError, Interpretation};
 use crate::key::KeyError;
 use crate::layer::Layer;
-use crate::migrate::{self, MigrationError, Step};
+use crate::migrate::{self, DocumentError, MigrationError, Step};
 use crate::take::{HostAnchor, Take};
 use crate::time::SampleRate;
 
@@ -43,7 +43,9 @@ pub struct Project {
     pub schema_version: u32,
     pub id: ProjectId,
     pub output_rate: SampleRate,
+    #[serde(deserialize_with = "crate::strict::map")]
     pub takes: BTreeMap<TakeId, Take>,
+    #[serde(deserialize_with = "crate::strict::map")]
     pub palettes: BTreeMap<PaletteId, PaletteMeta>,
     pub teach_set: Option<TeachSetId>,
     pub interpretations: Vec<Interpretation>,
@@ -82,6 +84,8 @@ pub enum ProjectError {
     /// A take filed under another id, with no channels, or with a non-finite
     /// host anchor.
     InvalidTake(TakeId),
+    /// Every local id has been allocated (`next_id == u32::MAX`).
+    IdsExhausted,
 }
 
 impl fmt::Display for ProjectError {
@@ -98,6 +102,7 @@ impl fmt::Display for ProjectError {
             Self::Interp(i, e) => write!(f, "interpretation {}: {e}", i.0),
             Self::Key(e) => write!(f, "key: {e}"),
             Self::InvalidTake(t) => write!(f, "take {t} is malformed"),
+            Self::IdsExhausted => f.write_str("every local id has been allocated"),
         }
     }
 }
@@ -120,11 +125,13 @@ impl Project {
     }
 
     /// The next local id. Ids are never reused, so an id in the undo history
-    /// cannot change meaning.
-    pub fn alloc_id(&mut self) -> u32 {
+    /// cannot change meaning. `IdsExhausted` once `next_id` is `u32::MAX`: a
+    /// valid project may hold that value, and then cannot grow, but never
+    /// panics.
+    pub fn alloc_id(&mut self) -> Result<u32, ProjectError> {
         let id = self.next_id;
-        self.next_id = id.checked_add(1).expect("local id space exhausted");
-        id
+        self.next_id = id.checked_add(1).ok_or(ProjectError::IdsExhausted)?;
+        Ok(id)
     }
 
     /// Identical PCM is one take: an existing record is kept as it is.
@@ -229,31 +236,20 @@ impl Project {
     /// [`from_json`](Self::from_json) under an explicit migration chain to
     /// `current`, for testing chains that production does not have yet.
     ///
-    /// The typed decode never reads floats out of a `serde_json::Value`, which
-    /// holds f64 (see [`json`]): an unmigrated file decodes from its own
-    /// bytes, and a migrated one from the migrated document printed back to
-    /// text, which reprints each untouched number as written.
+    /// The decode is [`migrate::load`]'s: it never reads floats out of a
+    /// `serde_json::Value`, which holds f64 (see [`json`]), and refuses a
+    /// repeated key on either path.
     pub fn from_json_with(
         bytes: &[u8],
         steps: &[Step],
         current: u32,
     ) -> Result<Loaded, ProjectError> {
-        let mut doc: serde_json::Value =
-            serde_json::from_slice(bytes).map_err(|e| ProjectError::Json(e.to_string()))?;
-        let found = migrate::read_version(&doc).map_err(ProjectError::Migration)?;
-        if found > current {
-            return Err(ProjectError::Migration(MigrationError::TooNew {
-                found,
-                supported: current,
-            }));
-        }
-        let migrated_from =
-            migrate::migrate(&mut doc, steps, current).map_err(ProjectError::Migration)?;
-        let decoded = match migrated_from {
-            None => serde_json::from_slice::<Project>(bytes),
-            Some(_) => serde_json::to_vec(&doc).and_then(|text| serde_json::from_slice(&text)),
-        };
-        let project = decoded.map_err(|e| ProjectError::Json(e.to_string()))?;
+        let (project, migrated_from) =
+            migrate::load::<Project>(bytes, steps, current).map_err(|e| match e {
+                DocumentError::Json(m) => ProjectError::Json(m),
+                DocumentError::Migration(e) => ProjectError::Migration(e),
+                DocumentError::Key(e) => ProjectError::Key(e),
+            })?;
         project.validate()?;
         Ok(Loaded {
             project,

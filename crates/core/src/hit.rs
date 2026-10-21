@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ids::{EvidenceKey, Hash32, HitSetKey, TakeId, TeachSetId, context};
 use crate::key::{KeyError, KeyHash, KeyKind, KeyWriter, RawHasher, SetOf, key_of};
+use crate::migrate::{self, DocumentError, Step};
 use crate::params::Params;
 use crate::time::{TimelinePos, TimelineSpan};
 
@@ -86,6 +87,7 @@ impl KeyHash for RoleName {
 pub struct ClassifierStamp {
     pub id: String,
     pub version: u32,
+    #[serde(deserialize_with = "crate::strict::map")]
     pub params: Params,
 }
 
@@ -163,12 +165,86 @@ impl HitSet {
 /// The container version of the hit cache. A mismatch is a cache miss.
 pub const HIT_CACHE_VERSION: u32 = 1;
 
+/// The version field of a hit cache file.
+pub const HIT_CACHE_VERSION_FIELD: &str = "container_version";
+
 /// `cache/hits/<key>.json` as written: the hit set under its container version.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HitCacheFile {
     pub container_version: u32,
     pub set: HitSet,
+}
+
+/// Why a hit cache file was not used. Every one is a cache miss: recompute
+/// the set and write it again.
+#[derive(Clone, Debug, PartialEq)]
+pub enum HitCacheError {
+    /// Malformed JSON or a typed-decode failure.
+    Json(String),
+    /// No container version: never read as 0.
+    MissingVersion,
+    /// Written under another container version, older or newer; never
+    /// decoded as this build's.
+    VersionMismatch { found: u32, supported: u32 },
+    /// The file holds the set of another key.
+    KeyMismatch,
+}
+
+impl fmt::Display for HitCacheError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Json(m) => write!(f, "hit cache: {m}"),
+            Self::MissingVersion => f.write_str("hit cache has no container version"),
+            Self::VersionMismatch { found, supported } => write!(
+                f,
+                "hit cache container version {found}, this build reads {supported}"
+            ),
+            Self::KeyMismatch => f.write_str("hit cache holds another key's set"),
+        }
+    }
+}
+
+impl std::error::Error for HitCacheError {}
+
+impl HitCacheFile {
+    /// `set` under the current container version.
+    pub fn new(set: HitSet) -> Self {
+        Self {
+            container_version: HIT_CACHE_VERSION,
+            set,
+        }
+    }
+
+    /// Compact and deterministic, written by [`crate::project::json`] so
+    /// every f32 reads back exactly.
+    pub fn to_json(&self) -> Vec<u8> {
+        // A hit set holds a key, role names, integers and f32s, and no map.
+        crate::project::json::to_vec(self).expect("a hit cache file serialises")
+    }
+
+    /// The set stored for `expected`. Reads the container version first
+    /// (required); any other version is [`HitCacheError::VersionMismatch`],
+    /// a cache miss, and the file is not decoded. A file holding another
+    /// key's set is never a silent substitute.
+    pub fn from_json(bytes: &[u8], expected: HitSetKey) -> Result<HitSet, HitCacheError> {
+        let json = |e: serde_json::Error| HitCacheError::Json(e.to_string());
+        let doc: serde_json::Value = serde_json::from_slice(bytes).map_err(json)?;
+        let found = migrate::read_version_field(&doc, HIT_CACHE_VERSION_FIELD)
+            .map_err(|_| HitCacheError::MissingVersion)?;
+        if found != HIT_CACHE_VERSION {
+            return Err(HitCacheError::VersionMismatch {
+                found,
+                supported: HIT_CACHE_VERSION,
+            });
+        }
+        let file: HitCacheFile = serde_json::from_slice(bytes).map_err(json)?;
+        if file.set.key == expected {
+            Ok(file.set)
+        } else {
+            Err(HitCacheError::KeyMismatch)
+        }
+    }
 }
 
 /// The key of (evidence key, classifier stamp, teach set).
@@ -259,6 +335,34 @@ pub const TEACH_SCHEMA_VERSION: u32 = 1;
 pub struct TeachFile {
     pub schema_version: u32,
     pub set: TeachSet,
+}
+
+/// The migration chain of `teach/*.json`: empty at schema 1.
+pub const TEACH_STEPS: &[Step] = &[];
+
+impl TeachFile {
+    /// `set` as a document of the current schema.
+    pub fn new(set: TeachSet) -> Self {
+        Self {
+            schema_version: TEACH_SCHEMA_VERSION,
+            set,
+        }
+    }
+
+    /// Compact and deterministic, written by [`crate::project::json`].
+    pub fn to_json(&self) -> Vec<u8> {
+        // Ids, positions and role names only.
+        crate::project::json::to_vec(self).expect("a teach file serialises")
+    }
+
+    /// Reads the version (required) -> TooNew? -> typed decode. The labels
+    /// are a set: a repeated label is `Key(DuplicateKey)`. No migration step
+    /// exists yet, so an older version is a `Gap`.
+    pub fn from_json(bytes: &[u8]) -> Result<Self, DocumentError> {
+        let (file, _) = migrate::load::<Self>(bytes, TEACH_STEPS, TEACH_SCHEMA_VERSION)?;
+        file.set.id().map_err(DocumentError::Key)?;
+        Ok(file)
+    }
 }
 
 /// Selects the nearest anchor within `tol` samples (timeline rate); a tie
