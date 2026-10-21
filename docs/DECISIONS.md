@@ -133,3 +133,6 @@ Evidence keeps every SuperFlux local maximum (24 bands/octave, 30 Hz to 17 kHz, 
 - The tilt fit includes the nominal 8 kHz third-octave band (centre 8063 Hz) as documented.
 - A WAV with sample rate 0 is an error, not a panic.
 - Kept on purpose: audio before the take is silence, so a take that starts mid-sound (or on loud room tone) has an onset candidate at its first frame; AVP files begin with a hit at 0.000 s. Instant attacks read up to 1 ms early (centred 2 ms envelope box); shifting by half a box made AVP timing slightly worse.
+
+## 2026-10-21: `takedown analyze` CSV contract
+`analyze` writes one row per 200 Hz frame (stdout unless `--frames`) and, with `--onsets`, every onset candidate with its strength, rise and a `picked` flag from the default pick, so threshold sweeps need no re-analysis. Undefined values are empty fields. The decoded `f0_hz` is defined on every frame and `voiced` says whether to use it; `score.py` follows the MIREX convention (negative frequency for unvoiced frames) so RPA and RCA measure the pitch track independently of voicing. The CSV is an output format for evaluation only, not a store. Scoreboards and CSVs go to `research/out/`, which is gitignored. Argument parsing is hand-rolled; three flags did not justify a parser dependency.
