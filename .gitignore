@@ -1,0 +1,21 @@
+# Rust
+/target/
+**/target/
+*.pdb
+
+# Python research env
+research/.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Local data and renders (golden set goes through LFS or a release, not plain git)
+research/data/
+exports/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
