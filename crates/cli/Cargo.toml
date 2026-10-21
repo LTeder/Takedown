@@ -1,0 +1,20 @@
+[package]
+name = "takedown-cli"
+description = "Takedown command-line tool: analyze, render, batch"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "takedown"
+path = "src/main.rs"
+
+[dependencies]
+takedown-core.workspace = true
+takedown-evidence.workspace = true
+
+[lints]
+workspace = true

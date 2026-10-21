@@ -22,3 +22,5 @@ Prefer clean, redistributable sets and record provenance; pretrained checkpoints
 
 ## 2026-10-20: Research docs live under docs/research and are expected to rot
 They are planning artifacts. CLAUDE.md, MASTER-PLAN.md, LICENSES.md and this file are the maintained rules. The master plan is expected to shrink into ARCHITECTURE.md and ROADMAP.md as code lands.
+## 2026-10-20: Workspace lint and toolchain baseline
+Edition 2024, MSRV 1.90, stable toolchain via `rust-toolchain.toml`. Clippy `all` + `pedantic` at warn in `[workspace.lints]`, with the numeric-cast and doc lints that fight DSP code allowed; CI will run `-D warnings` so warn locally means fail in CI. `unsafe_code` is warn, not forbid, so a justified `unsafe` block with a comment stays possible. `cargo test` profile uses opt-level 2 so DSP and property tests run at useful speed. Rules out per-crate lint drift.
