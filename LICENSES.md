@@ -11,6 +11,7 @@ Takedown is GPL-3.0-or-later. Every third-party component, model weight set and 
 | serde, serde_json (serde-rs) | MIT OR Apache-2.0 | `core` persistence; serde_json with `float_roundtrip` | crates.io |
 | blake3 (BLAKE3 team) | CC0-1.0 OR Apache-2.0 (OR Apache-2.0 WITH LLVM-exception) | Take ids, keys, content hashes, seed derivation | crates.io |
 | proptest | MIT OR Apache-2.0 | Tests only (dev-dependency; `render` testkit feature) | Not in shipped binaries |
+| realfft, rustfft (HEnquist, ejmahler) | MIT; MIT OR Apache-2.0 | `evidence` FFTs (YIN, spectra, cepstrum) | crates.io |
 | Transitive crates.io dependencies | MIT, Apache-2.0, CC0-1.0, MIT-0 or Unlicense (each dual- or multi-licensed) | Pulled in by the rows above | Checked with `cargo metadata` on 2026-10-21; recheck when adding a dependency |
 | Pretrained model checkpoints (SwiftF0, PESTO, CREPE, ...) | Varies (code MIT/LGPL; weights trained on mixed-licence data) | Evaluation and comparison in `research/`; shipping decided per model with provenance recorded here | Policy: prefer clean sets, retrain where cheap |
 

@@ -106,3 +106,30 @@ An exhaustive check of all 2^32 f32 bit patterns found two (±7.038531e-26) whos
 4. `Project::save` refuses an invalid project and never overwrites an existing `.bak`; `from_json_with` takes a step list so test-only migration chains can run; `migrate` writes `schema_version` after each step itself.
 5. `TimeMap` rounds ties half up; a tick before the origin maps to sample 0.
 6. A NaN or infinity fed to `TakeHasher` poisons the rest of that hash (capture bug, rejected at `finish`).
+
+## 2026-10-21: Evidence stores pYIN candidates; decoding is a separate pure function
+The evidence crate stores per frame the top three pYIN troughs (frequency and probability) and the total voiced probability. Viterbi decoding (`evidence::decode`) reads only those, takes every opinion as a `DecodeParams` field (range prior, step size, octave-jump penalty, switching cost, voicing threshold) and re-decodes a 10-minute take without touching audio, so the lens can call it per slider move. It lives in `evidence` rather than `render` because `cli analyze` needs a default decode for evaluation; the lens will own the parameters. Top-3 loses the probability mass of further troughs; on Vocadito that cost nothing measurable.
+
+## 2026-10-21: Pitch and voicing are decoded separately, not in pYIN's joint HMM
+pYIN's joint model scores unvoiced states at `(1 - p) / n_bins` each, so any frame with a candidate far above `1 / n_bins` decodes voiced: 27.6% voicing false alarm on Vocadito. Scoring unvoiced states at `1 - p` fixed false alarms but let the unvoiced layer's pitch memory drift (RPA fell from 98.7 to 87.7). The decoder now runs a pitch-only Viterbi (unvoiced mass spread over all bins as a floor, so the path holds through gaps) and a separate two-state voicing Viterbi with threshold 0.5 and switch probability 0.01. Vocadito: RPA 98.7, VR 90.3, VFA 6.7.
+
+## 2026-10-21: Octave-jump penalty is an explicit transition, not a prohibition
+Transitions are a triangular kernel of +/-2.155 semitones per 5 ms frame (pYIN's 35.92 octaves/s) plus near-octave links at 1e-3 of a local move's weight. A one-frame octave blip cannot win; a sustained octave disagreement can be corrected. Range prior default 55 to 1100 Hz (lens setting; the founder's range calibration replaces it).
+
+## 2026-10-21: f0 runs at capture rate in v0.1, not on a 16 kHz copy
+MASTER-PLAN 4.6 says f0 at 16 kHz. Running YIN at capture rate avoids a resampler dependency and its drift for now; a 10-minute 48 kHz take analyses in 8.3 s with 306 MB peak RSS. Downsampling for f0 is an optimisation to take if analysis time matters in the app.
+
+## 2026-10-21: Evidence analysis constants
+All fixed, all part of `ANALYZER_VERSION` 1: candidate range 40 to 2000 Hz; YIN integration window 25 ms centred on the frame; loudness window 23.2 ms (A-weighted mean square, dBFS, floor -120); spectral window 46.4 ms for centroid, tilt (third-octave band regression 100 Hz to 8 kHz, mean power per bin) and CPP (quefrency 60 to 880 Hz, regression over the same range); undefined values (silence below -90 dBFS, no pitch candidate for harmonic units) are NaN. Centroid in harmonic units divides by the most probable candidate, which is parameter-free; dividing by the decoded f0 instead is lens work.
+
+## 2026-10-21: Onset candidates and the default pick
+Evidence keeps every SuperFlux local maximum (24 bands/octave, 30 Hz to 17 kHz, lag 2 frames, max over 10 ms before and 20 ms after, strength above a 150 ms trailing mean) refined by backtracking to where the 2 ms energy envelope (dB) crossed 30% of the rise from its 60 ms floor to the hit's peak, plus that rise in dB. SuperFlux's 50 ms post-max and the 15%-of-peak backtrack from docs/research/08 both put onsets 20 to 40 ms late on two-part beatbox sounds (a soft "p" before the loud "kh"). The default pick in `onset::pick` (threshold 1.1, 60 ms refractory, and inside 100 ms of a kept onset only candidates rising at least 25 dB) is for `cli analyze` and evaluation; the drums crate owns the real decision. The post-max, backtrack and pick values were chosen while looking at AVP, so AVP numbers are optimistic; the golden set is the honest test.
+
+## 2026-10-21: Fixes from an independent review of the evidence crate
+- Pitch transitions use one normaliser for every row. Per-row normalisation (as in librosa's `transition_local`) made the range edges attractors, so held pitch through a long unvoiced gap fell by octaves; now 220 Hz holds through 400-frame gaps. When no frame has an in-range candidate, f0 is 0 throughout.
+- Non-finite input samples are treated as 0 (one NaN otherwise erased onsets for 150 ms).
+- CPP smooths the power cepstrum over 1 ms of quefrency (CPPS-style); on a voice-like tone with a 40 dB floor it varies under 1.5 dB across 218 to 222 Hz. In noiseless synthetic tones it still varies by 2 to 3 dB because sidelobe dips dominate; real voices always have a floor.
+- Spectral centroid stops at 16 kHz so it does not scale with capture rate (it read 765 Hz at 44.1 kHz and 901 Hz at 192 kHz for the same tone).
+- The tilt fit includes the nominal 8 kHz third-octave band (centre 8063 Hz) as documented.
+- A WAV with sample rate 0 is an error, not a panic.
+- Kept on purpose: audio before the take is silence, so a take that starts mid-sound (or on loud room tone) has an onset candidate at its first frame; AVP files begin with a hit at 0.000 s. Instant attacks read up to 1 ms early (centred 2 ms envelope box); shifting by half a box made AVP timing slightly worse.

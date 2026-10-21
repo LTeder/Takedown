@@ -1,6 +1,6 @@
 [package]
 name = "takedown-evidence"
-description = "Takedown: evidence crate"
+description = "Takedown: parameter-free DSP analysis of a take"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,8 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+realfft.workspace = true
+takedown-core.workspace = true
 
 [lints]
 workspace = true
