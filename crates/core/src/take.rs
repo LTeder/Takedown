@@ -81,8 +81,8 @@ impl TakeHasher {
         }
         let mut buf = [0u8; 4 * BATCH];
         for chunk in interleaved.chunks(BATCH) {
-            for (out, x) in buf.chunks_exact_mut(4).zip(chunk) {
-                out.copy_from_slice(&x.to_bits().to_le_bytes());
+            for (out, x) in buf.as_chunks_mut::<4>().0.iter_mut().zip(chunk) {
+                *out = x.to_bits().to_le_bytes();
             }
             self.hasher.update(&buf[..4 * chunk.len()]);
         }

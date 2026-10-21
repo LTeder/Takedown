@@ -11,7 +11,7 @@
 | 3 | Core types from a judge panel (3 designs, 3 adversarial judges, synthesis), then implemented: time base, keys, seed tree, ControlTrack, views, edits, Take, Evidence and `.tkev`, interpretations, layers, project and migrations in `core`; the render contract (backend trait, segment plan, driver, offline render, testkit) in `render::contract` | `docs/design/core-types.md`, `crates/core`, `crates/render` |
 | 4 | DSP evidence: pYIN candidates, separate pitch and voicing Viterbi with an octave-jump penalty, A-weighted loudness, centroid (Hz and harmonic units), tilt, smoothed CPP, SuperFlux onsets with energy backtracking; conversion to core `Evidence` | `crates/evidence` |
 | 5 | `takedown analyze` (per-frame CSV plus onset candidates); `research/eval/score.py` scoring with mir_eval | `crates/cli`, `research/eval` |
-| 6 | GitHub Actions: fmt, clippy, build, test on macOS and Windows; weekly `cargo update` canary | `.github/workflows/ci.yml` |
+| 6 | GitHub Actions: fmt, clippy, build, test on macOS and Windows; weekly `cargo update` canary; toolchain pinned to 1.99.1 after the first run showed CI's newer clippy | `.github/workflows/ci.yml`, `rust-toolchain.toml` |
 
 Tests: 147 test functions, most of them property tests at 128 to 256 cases (core 89, render contract 21, evidence 35, cli 2), including the four CLAUDE.md requires: exact sample-to-control mapping, block-size invariance, chunked equals monolithic, seed-tree independence. The render suite was mutation-checked against seven deliberate bugs; each was caught.
 
@@ -59,4 +59,4 @@ Every assumption is a dated entry in `docs/DECISIONS.md`. The ones most worth a 
 3. **Octave-down errors.** A decoder rule or prior for subharmonic troughs that are only marginally deeper than the fundamental's (vocadito_34).
 4. **drums crate.** Onset refinement into `Hit` events using the stored strength and rise, the "b + oom" merge, per-user kNN roles; score per-user accuracy at 5 and 10 shots on AVP.
 5. **lens and the first backend** in `render`, to reach the week-4 gate; then the midi crate with the deferred projection and its round-trip tests.
-6. **Smaller items.** Pin the CI toolchain to a version if stable releases start failing clippy; parallelise or downsample f0 if analysis time matters in the app; persist the scoreboard baseline so CI can fail on regressions (docs/research/08 §7).
+6. **Smaller items.** Bump the pinned toolchain (1.99.1) deliberately now and then; parallelise or downsample f0 if analysis time matters in the app; persist the scoreboard baseline so CI can fail on regressions (docs/research/08 §7).

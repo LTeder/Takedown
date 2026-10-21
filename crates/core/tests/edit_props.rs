@@ -1445,7 +1445,7 @@ fn no_edits_gives_the_sorted_draft() {
         vec![hit(500, 10, 1), hit(100, 10, 0)],
     );
     let (t, reports) = apply_edits(p.clone(), &[]).unwrap();
-    assert!(reports.is_empty());
+    assert_eq!(reports, []);
     assert_eq!(t, ControlTrack::new(p).unwrap());
 }
 
@@ -1849,7 +1849,7 @@ fn mute_span_clips_splits_and_relinks() {
         },
     );
     assert_eq!(o, Outcome::Applied);
-    assert!(t.spans.is_empty());
+    assert_eq!(t.spans, []);
     // Empty, or starting at or past the end: out of range.
     for span in [
         tspan(500, 500),

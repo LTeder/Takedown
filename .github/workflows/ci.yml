@@ -23,8 +23,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      # Matches rust-toolchain.toml (stable with rustfmt and clippy).
-      - run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+      # Installs the toolchain and components pinned in rust-toolchain.toml.
+      - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - name: cargo update (canary only)
         if: github.event_name == 'schedule'

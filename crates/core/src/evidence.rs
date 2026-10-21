@@ -525,11 +525,20 @@ impl Evidence {
             .enumerate()
             .map(|(i, c)| {
                 let raw = &column_body[i * per_column..(i + 1) * per_column];
-                (*c, raw.chunks_exact(4).map(le_f32).collect())
+                (
+                    *c,
+                    raw.as_chunks::<4>()
+                        .0
+                        .iter()
+                        .map(|b| f32::from_le_bytes(*b))
+                        .collect(),
+                )
             })
             .collect();
         let onsets = onset_body
-            .chunks_exact(ONSET_BYTES)
+            .as_chunks::<ONSET_BYTES>()
+            .0
+            .iter()
             .map(|b| OnsetCandidate {
                 at: TimelinePos(le_u64(&b[..8])),
                 strength: le_f32(&b[8..12]),

@@ -277,7 +277,7 @@ fn cpp_falls_as_breath_noise_rises() {
 fn silence_is_silent() {
     let sr = 48_000;
     let a = analyze(&vec![0.0f32; sr as usize], sr);
-    assert!(a.onsets.is_empty());
+    assert_eq!(a.onsets, []);
     let d = decode(&a.pitch, &DecodeParams::default());
     assert!(d.voiced.iter().all(|&v| !v));
     for t in &a.timbre {
@@ -290,8 +290,8 @@ fn silence_is_silent() {
 fn empty_take_has_no_frames() {
     let a = analyze(&[], 44_100);
     assert_eq!(a.frames(), 0);
-    assert!(a.onsets.is_empty());
-    assert!(decode(&a.pitch, &DecodeParams::default()).f0_hz.is_empty());
+    assert_eq!(a.onsets, []);
+    assert_eq!(decode(&a.pitch, &DecodeParams::default()).f0_hz.len(), 0);
 }
 
 #[test]

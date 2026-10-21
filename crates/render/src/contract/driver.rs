@@ -123,9 +123,8 @@ impl EventCursor {
                         if let Some(s) = segments.get(self.seg) {
                             stop = stop.min(s.quiet_from.0);
                         }
-                        if self.cell != 0 {
-                            let next_cell = (self.pos / self.cell + 1).saturating_mul(self.cell);
-                            stop = stop.min(next_cell);
+                        if let Some(q) = self.pos.checked_div(self.cell) {
+                            stop = stop.min((q + 1).saturating_mul(self.cell));
                         }
                     }
                     // Every bound above lies strictly after `pos`.
