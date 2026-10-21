@@ -5,8 +5,8 @@ Open-source (GPL-3.0-or-later) Rust tool: beatbox, hum or breathe into a mic and
 ## Read first
 
 - `docs/MASTER-PLAN.md` is authoritative. Where any other doc conflicts with it, the master plan wins.
-- `docs/05`–`08` are adversarial reviews; `docs/06` (engine), `07` (types and threading) and `08` (DSP recipes, licences) hold detail the plan refers to. Open sections on demand.
-- `docs/00`–`04` are the original survey and are superseded.
+- `docs/DECISIONS.md` is the append-only decisions log; add an entry whenever you make a call the code does not explain.
+- `docs/research/05`–`08` are adversarial reviews; `06` (engine), `07` (types and threading) and `08` (DSP recipes, licences) hold detail the plan refers to. Open sections on demand. `docs/research/00`–`04` are the original survey and are superseded. Research docs are expected to rot; the maintained rules are CLAUDE.md, MASTER-PLAN.md, LICENSES.md and DECISIONS.md.
 
 ## Hard rules
 

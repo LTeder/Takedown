@@ -1,6 +1,6 @@
 # Takedown: Master Plan v1.1
 
-*2026-10-20. Supersedes docs 00 through 04 where they conflict, and revises v1 of this plan after the founder's pushback. Distilled from the four research passes (01–04), the founder discussion recorded in 00 §8, the four adversarial reviews (05–08), and the founder's direction on aesthetic and workflow.*
+*2026-10-20. Supersedes research docs 00 through 04 where they conflict, and revises v1 of this plan after the founder's pushback. Distilled from the four research passes (research/01–04), the founder discussion recorded in research/00 §8, the four adversarial reviews (research/05–08), and the founder's direction on aesthetic and workflow. Decisions made after this date go in DECISIONS.md.*
 
 ---
 
