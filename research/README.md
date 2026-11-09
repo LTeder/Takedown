@@ -43,6 +43,29 @@ uv run python eval/score.py onsets ONSETS.csv REF.csv --window 0.025 [--threshol
 
 Pitch follows the MIREX convention: frames the decoder calls unvoiced still report their held pitch as a negative frequency, so RPA and RCA measure the pitch track independently of the voicing decision. Onset scores pool true positives, estimates and references over all files (`F`) and also average per-file F (`F_macro`). `--threshold` re-picks candidates by strength alone, without the refractory and continuation rules of the default pick, so threshold sweeps need no re-analysis.
 
+## Week 0 pre-check
+
+`week0/precheck.py` is the throwaway pre-check from MASTER-PLAN §5: it turns beatbox fills into drum MIDI and hums into MPE, so the founder can hear designed sounds driven by their own performance before any of Takedown's engine exists. Its docstring has the details.
+
+```bash
+# fills: one .mid per take, one track per role, General MIDI notes on channel 10
+uv run python week0/precheck.py fills fill01.wav fill02.wav ... --kick kicks.wav --snare snares.wav --hat hats.wav
+# hums: one MPE .mid per take (lower zone, 15 member channels, bend range 48)
+uv run python week0/precheck.py hums hum1.wav hum2.wav hum3.wav
+```
+
+Everything lands in `out/week0/`. The teach takes are optional but worth the minute they take: about ten of each sound, each on its own with a gap after it. With them, roles match AVP's labels about 73% of the time; without them (brightness alone) 54%.
+
+**Recording.** About ten fills, played as loosely as you really perform, and three hums with some glides and re-articulated notes. One WAV per fill or hum, 48 kHz mono, trimmed so each starts just before the first sound.
+
+**Listening, in Reaper.**
+1. Use a project at the default 120 BPM, so the MIDI lines up with the audio. Put each take on a track at the start of the project and its `.mid` at the start too.
+2. Fills: let Reaper expand the file into one track per role (kick, snare, hat). Put a drum synth or drum rack on each, with distortion, saturation or a bitcrusher after it. Velocity carries accents, note length carries how long the hit rang, and CC74 carries the hit's brightness for anything you map it to.
+3. Hums: put an MPE synth on the track (Surge XT and Vital both do MPE) with an FM-style patch, MPE on and the bend range at 48 semitones. Pressure follows your loudness and CC74 your brightness.
+4. Mute the takes and listen. Swap patches freely: the question is whether your performance driving designed sounds excites you, not whether these patches are right.
+
+**The decision.** If nothing excites you, the plan says stop. If something does, note what (which fill, which patch, what made it work); that seeds the starter palettes for the week-4 gate.
+
 ## Listening check
 
 ```bash

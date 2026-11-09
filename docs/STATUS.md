@@ -60,7 +60,7 @@ Every assumption is a dated entry in `docs/DECISIONS.md`. The ones most worth a 
 
 ## Next
 
-1. **Week 0 listening pre-check** (MASTER-PLAN §5), skipped so far: a throwaway script turns fills into per-hit MIDI and hums into MPE, the founder plays them through drum and FM patches with distortion in Reaper and decides whether anything excites.
+1. **Week 0 listening pre-check** (MASTER-PLAN §5). `research/week0/precheck.py` (2026-11-09) turns fills into per-role drum MIDI and hums into MPE. The founder's part remains: record about ten fills, three hums and a short teach take per sound, play them through drum and FM patches with distortion in Reaper (`research/README.md`), and decide whether anything excites.
 2. **Record the golden set** (docs/RECORDING-PROTOCOL.md). Every number above is a proxy until the founder's own hums, fills and noisy-room takes are scored; gate E1 is defined on them.
 3. **Voicing in noise.** Fuse voiced probability with loudness relative to the take's floor and with CPP, or make the threshold adaptive per take; test on the fan-noise recordings and on the 59 Hz room tone in the founder's first take. This is the one evidence curve that clearly fails today. The fix is to the conservative voicing that evaluation reports; eager voicing for sound is a separate lens setting (DECISIONS, 2026-11-09).
 4. **Octave-down errors.** A decoder rule or prior for subharmonic troughs that are only marginally deeper than the fundamental's (vocadito_34).
