@@ -1,6 +1,6 @@
 # Status
 
-*2026-10-21, after the first unattended session (steps 1 to 6 of the kickoff list). Newest first in "Next"; numbers are reproducible with `research/README.md`.*
+*2026-10-21, after the first unattended session (steps 1 to 6 of the kickoff list); updated 2026-11-09 with the founder's first take and review. Newest first in "Next"; numbers are reproducible with `research/README.md`.*
 
 ## Done
 
@@ -44,6 +44,12 @@ All from `takedown analyze` with default settings, scored by `research/eval/scor
 
 **Cost:** a 10-minute 48 kHz take analyses in 8.3 s single-threaded with 306 MB peak RSS (budget 600 MB).
 
+**Founder's first take** (2026-11-09; 179 s at 48 kHz recorded in Reaper: beatbox, hums, what looks like a whistle, and a dense fill). Not scored, since there is no annotation; looked at, not yet listened to. Plot and listening stems from `research/out/fill-check/`.
+- Hum tracking is clean: f0 follows the fundamental through glides with no octave errors in the hummed sections.
+- 436 onsets picked; on the beatbox passages they land at hit starts. The dense passage at 165 to 178 s gets 79 onsets in 13 s; whether that is right needs an ear.
+- **The room has a steady low tone near 59 Hz** (not mains: 58.8 Hz, too far from 60), and voicing calls it voiced: 1,453 frames (7 s) are voiced below 62 Hz at a median loudness of -71 dB, in pauses between notes and between hits. Same root cause as voicing in noise below: voiced probability with no notion of level relative to the take's floor.
+- The whistle (about 500 to 1,100 Hz) is tracked where it stays under the decoder's 1,100 Hz ceiling and is unvoiced above it.
+
 ## Assumptions
 
 Every assumption is a dated entry in `docs/DECISIONS.md`. The ones most worth a look:
@@ -54,9 +60,10 @@ Every assumption is a dated entry in `docs/DECISIONS.md`. The ones most worth a 
 
 ## Next
 
-1. **Record the golden set** (docs/RECORDING-PROTOCOL.md). Every number above is a proxy until the founder's own hums, fills and noisy-room takes are scored; gate E1 is defined on them.
-2. **Voicing in noise.** Fuse voiced probability with loudness relative to the take's floor and with CPP, or make the threshold adaptive per take; test on the fan-noise recordings. This is the one evidence curve that clearly fails today.
-3. **Octave-down errors.** A decoder rule or prior for subharmonic troughs that are only marginally deeper than the fundamental's (vocadito_34).
-4. **drums crate.** Onset refinement into `Hit` events using the stored strength and rise, the "b + oom" merge, per-user kNN roles; score per-user accuracy at 5 and 10 shots on AVP.
-5. **lens and the first backend** in `render`, to reach the week-4 gate; then the midi crate with the deferred projection and its round-trip tests.
-6. **Smaller items.** Bump the pinned toolchain (1.99.1) deliberately now and then; parallelise or downsample f0 if analysis time matters in the app; persist the scoreboard baseline so CI can fail on regressions (docs/research/08 §7).
+1. **Week 0 listening pre-check** (MASTER-PLAN §5), skipped so far: a throwaway script turns fills into per-hit MIDI and hums into MPE, the founder plays them through drum and FM patches with distortion in Reaper and decides whether anything excites.
+2. **Record the golden set** (docs/RECORDING-PROTOCOL.md). Every number above is a proxy until the founder's own hums, fills and noisy-room takes are scored; gate E1 is defined on them.
+3. **Voicing in noise.** Fuse voiced probability with loudness relative to the take's floor and with CPP, or make the threshold adaptive per take; test on the fan-noise recordings and on the 59 Hz room tone in the founder's first take. This is the one evidence curve that clearly fails today.
+4. **Octave-down errors.** A decoder rule or prior for subharmonic troughs that are only marginally deeper than the fundamental's (vocadito_34).
+5. **drums crate.** Onset refinement into `Hit` events using the stored strength and rise, the "b + oom" merge, per-user kNN roles; score per-user accuracy at 5 and 10 shots on AVP.
+6. **lens and the first backend** in `render`, to reach the week-4 gate; then the midi crate with the deferred projection and its round-trip tests.
+7. **Smaller items.** Bump the pinned toolchain after each stable release (the founder's preference; 1.100 is due around 12 November 2026); decide whether whistles above 1,100 Hz should be voiced; parallelise or downsample f0 if analysis time matters in the app; persist the scoreboard baseline so CI can fail on regressions (docs/research/08 §7).

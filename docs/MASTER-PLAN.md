@@ -1,6 +1,8 @@
-# Takedown: Master Plan v1.1
+# Takedown: Master Plan v1.2
 
 *2026-10-20. Supersedes research docs 00 through 04 where they conflict, and revises v1 of this plan after the founder's pushback. Distilled from the four research passes (research/01–04), the founder discussion recorded in research/00 §8, the four adversarial reviews (research/05–08), and the founder's direction on aesthetic and workflow. Decisions made after this date go in DECISIONS.md.*
+
+*v1.2, 2026-11-09: the founder approved three changes from the first build pass (render hooks driven by a core-owned driver, gate spans instead of a gate curve, f0 at capture rate). They are folded into §3, §4.1 and §4.6 below; the reasoning is in docs/design/core-types.md and DECISIONS.md.*
 
 ---
 
@@ -45,7 +47,7 @@ An open-source Rust tool. You bark an embarrassing beatbox fill, hum a squeal, b
 
 1. **The renderer never sees notes.** Backends take a `ControlTrack` only. Fidelity, glide, retrigger, quantise and register are lens properties.
 2. **One object, two outputs.** `ControlTrack` → audio and `ControlTrack` → MPE `.mid` describe the same performance. MPE `.mid` → `ControlTrack` round-trips within quantisation, so an edited `.mid` re-renders through the same engine, and the hits can equally drive Serum.
-3. **Block-size invariance.** `process()` output is bit-identical for any block segmentation. One renderer for offline and live; smoothing is a function of absolute sample index.
+3. **Block-size invariance.** Render output is bit-identical for any block segmentation. The driver in `render::contract` owns the block loop and calls the backend's hooks at fixed absolute positions, so every backend gets invariance from the driver rather than re-proving it. One renderer for offline and live; smoothing is a function of absolute sample index.
 4. **Evidence is observation; the lens is opinion.** Nothing a slider changes lives in Evidence.
 5. **Time base.** Audio in integer samples at capture rate; curves on a fixed 200 Hz grid in seconds; onsets as sample positions; musical time is a lens over a `HostAnchor`.
 6. **Seeds are a tree, noise is counter-based.** `seed.derive(label, idx)`; noise = hash(seed, stream, sample_index). Rerolling one aspect or region never disturbs another. Locks are just "don't re-derive this child".
@@ -69,8 +71,11 @@ Hit            onset-anchored event: time (samples), duration, loudness, brightn
 LensSettings   versioned: palette id, fidelity, glide/retrigger, register, mouth amount, timing feel, quantise, per-aspect seeds + locks
 Edit           time-anchored override on lens output (ForcePitch, SplitAt, ForceRole, MuteSpan, ...)
 Interpretation (take, evidence key, lens settings, backend ref + preset, seed, edits)
-ControlTrack   200 Hz curves: pitch_st, amp_db, gate, bright, breath, vowel[2]; Triggers (Retrigger, NoteOn, NoteOff, Hit{role, vel, bright, dur, exciter})
-RenderBackend  trait: info(), prepare(sr, max_block), reset(seed, at), process(ctl, at, out)
+ControlTrack   200 Hz curves: pitch_st, amp_db, bright, breath, vowel[2]; gate spans linked Detached, Retrigger or Legato
+               (NoteOn/Retrigger/NoteOff are derived from the links); Hit{at, anchor, role, vel, bright, breath, dur, exciter},
+               where anchor is the evidence onset (identity, seeds) and at is when it fires
+RenderBackend  trait: info(), prepare(rate, max_block), reset(track, seeds, at), cell(track, at), trigger(track, trig), run(track, start, out);
+               called by the render::contract driver, never directly
 Voice          a backend instance plus its mangle chain and body preset; a palette is a set of voices with ranges
 Layer          (interpretation, materialised render keyed by interp hash + sample rate, gain, mute)
 Project        directory: project.json (schema-versioned, migrations) + audio/ + cache/
@@ -127,7 +132,7 @@ eframe/egui 0.37, cpal 0.18 (input stream only; shared mode), nice-plug 0.4.2 + 
 
 ### 4.6 Evidence and ML
 
-- **v0.1 is DSP only** (see docs 08 §2 for the per-curve recipe). f0 at 16 kHz, timbre features at capture rate.
+- **v0.1 is DSP only** (see docs 08 §2 for the per-curve recipe). f0 and timbre features at capture rate; resampling to 16 kHz for f0 is a speed optimisation to add if analysis time matters.
 - **Drums:** per-event MFCC + envelope features, per-user z-score, kNN with k=3, fit-time augmentation, confidence from distance ratio, 30–60 ms refractory window, "b + oom" merge. Roles are soft: the lens may reassign bodies under the dice. Teach flow in the app: perform each role a few times; a leave-one-out separability matrix comes free.
 - **Model only if earned:** if DSP fails on hum or noise, retrain SwiftF0 or PESTO on clean data (VocalSet, Vocadito, NSynth, PTDB-TUG, the founder's CC0 golden set, self-made resynthesis set). If several curves fail, a single causal multi-task CRNN trained as a student of the DSP teacher.
 - **Sound matching (v1):** CMA-ES fit of curve-to-parameter splines against the real engine on 10–20 s of a take, then a learned mapping. This is what Mouth amount and Timbre Follow grow into.

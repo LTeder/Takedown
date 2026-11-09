@@ -4,6 +4,8 @@ Open-source (GPL-3.0-or-later) Rust tool: beatbox, hum or breathe into a mic and
 
 ## Read first
 
+- `docs/STATUS.md` is where the project stands: what is done, the latest numbers, open findings, what comes next.
+- `docs/design/core-types.md` specifies the `core` types and the render contract; read the relevant section before changing either.
 - `docs/MASTER-PLAN.md` is authoritative. Where any other doc conflicts with it, the master plan wins.
 - `docs/DECISIONS.md` is the append-only decisions log; add an entry whenever you make a call the code does not explain.
 - `docs/research/05`–`08` are adversarial reviews; `06` (engine), `07` (types and threading) and `08` (DSP recipes, licences) hold detail the plan refers to. Open sections on demand. `docs/research/00`–`04` are the original survey and are superseded. Research docs are expected to rot; the maintained rules are CLAUDE.md, MASTER-PLAN.md, LICENSES.md and DECISIONS.md.
@@ -12,7 +14,7 @@ Open-source (GPL-3.0-or-later) Rust tool: beatbox, hum or breathe into a mic and
 
 - The renderer never sees notes. Backends take a `ControlTrack` only; the lens compiles everything.
 - One object, two outputs: audio and MPE `.mid` describe the same performance and round-trip.
-- `process()` is block-size invariant. Smoothing is a function of absolute sample index.
+- Rendering is block-size invariant. Backends implement the hooks in `render::contract` (`prepare`, `reset`, `cell`, `trigger`, `run`) and only the contract's driver calls them; smoothing is a function of absolute sample index.
 - Evidence is parameter-free observation; anything a slider changes is lens work.
 - Seeds are a tree; noise is counter-based. Edits are time-anchored, never index-anchored.
 - Nothing allocates on the audio thread.
@@ -29,6 +31,9 @@ Open-source (GPL-3.0-or-later) Rust tool: beatbox, hum or breathe into a mic and
 - Property tests for: sample↔control mapping, block-size invariance, chunked-equals-monolithic render, seed-tree independence.
 - Reaper 7.x is the only test host until v0.2. Plugin (nice-plug VST3 + CLAP) is v0.2; v0.1 is the eframe standalone plus CLI.
 - Clippy clean, `cargo fmt`, no `unsafe` without a comment saying why.
+- The Rust toolchain is pinned in `rust-toolchain.toml` to the latest stable release, and local builds and CI both use the pin. Bump it soon after each stable release, fixing any new clippy lints in the same commit; the founder prefers staying current over staying put.
+- All JSON writes go through `core::project::json`, which writes every `f32` so it reads back exactly. Versioned files are read through `core::migrate::load`, which checks the version and refuses repeated keys. Never decode typed values from a `serde_json::Value`: it reads `f32` through `f64` and keeps only the last of repeated keys.
+- Evaluation output (CSVs, scoreboards, plots) goes to `research/out/`, which is gitignored.
 
 ## Do not propose
 
