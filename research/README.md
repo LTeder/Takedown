@@ -43,4 +43,12 @@ uv run python eval/score.py onsets ONSETS.csv REF.csv --window 0.025 [--threshol
 
 Pitch follows the MIREX convention: frames the decoder calls unvoiced still report their held pitch as a negative frequency, so RPA and RCA measure the pitch track independently of the voicing decision. Onset scores pool true positives, estimates and references over all files (`F`) and also average per-file F (`F_macro`). `--threshold` re-picks candidates by strength alone, without the refractory and continuation rules of the default pick, so threshold sweeps need no re-analysis.
 
+## Listening check
+
+```bash
+uv run python eval/listen.py TAKE.wav --zoom 55:61 --zoom 118:128
+```
+
+For takes with no annotation, such as the founder's own. Runs `takedown analyze` and writes to `out/listen/<take>/` a plot (`check.png`: picked onsets over the waveform and the decoded pitch, for the whole take and each `--zoom START:END` in seconds) and two stems with the take's length and rate: `onset-clicks.wav` (a blip per picked onset) and `pitch-sine.wav` (a sine on the voiced f0). Put both under the take at the start of a Reaper project and listen for clicks with no hit, hits with no click, and a sine that jumps or sounds where nothing is sung.
+
 The local-only sets from `docs/research/08` §7 (MIR-1K, MDB-stem-synth, MedleyDB-Pitch) are not fetched: their licences rule out redistribution and CI.
