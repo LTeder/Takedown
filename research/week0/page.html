@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Takedown listening test</title>
+<style>
+  :root {
+    --bg: #fcfcfb; --panel: #f3f2ef; --ink: #0b0b0b; --ink2: #52514e; --line: #dcdbd6;
+    --wave: #8a8984; --tonal: #2a78d633; --accent: #2a78d6; --kick: #eb6834; --snare: #1baf7a; --hat: #eda100;
+    --yes: #008300; --close: #c98500; --no: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1a1a19; --panel: #262624; --ink: #f0efec; --ink2: #c3c2b7; --line: #3a3a37;
+      --wave: #7d7c76; --tonal: #3987e540; --accent: #3987e5; --kick: #d95926; --snare: #199e70; --hat: #c98500;
+      --yes: #2fa32f; --close: #c98500; --no: #e66767; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { margin: 0 0 12px; color: var(--ink2); }
+  kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font: 12px ui-monospace, monospace; }
+  .transport { position: sticky; top: 0; background: var(--bg); padding: 12px 0; z-index: 2; border-bottom: 1px solid var(--line); }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--ink2); }
+  #play { min-width: 84px; font-weight: 600; }
+  #now { font-weight: 600; }
+  #time { font-variant-numeric: tabular-nums; color: var(--ink2); margin-left: auto; }
+  canvas { width: 100%; height: 96px; display: block; margin-top: 10px; border-radius: 8px; background: var(--panel); cursor: pointer; }
+  .legend { font-size: 12px; color: var(--ink2); margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .sources { display: grid; gap: 10px; margin-top: 18px; }
+  .src { display: grid; grid-template-columns: 34px minmax(120px, 1fr) auto; gap: 10px; align-items: center;
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .src.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+  .src .key { color: var(--ink2); text-align: center; }
+  .src .name { font-weight: 600; }
+  .src .blurb { color: var(--ink2); font-size: 13px; }
+  .verdict { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .verdict button { padding: 3px 9px; font-size: 13px; }
+  .verdict button.sel[data-v="yes"] { background: var(--yes); color: #fff; border-color: var(--yes); }
+  .verdict button.sel[data-v="close"] { background: var(--close); color: #fff; border-color: var(--close); }
+  .verdict button.sel[data-v="no"] { background: var(--no); color: #fff; border-color: var(--no); }
+  .verdict label { font-size: 13px; color: var(--ink2); }
+  textarea { width: 100%; min-height: 90px; margin-top: 18px; font: inherit; color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  #copied { color: var(--ink2); font-size: 13px; }
+  @media (max-width: 640px) { .src { grid-template-columns: 28px 1fr; } .verdict { grid-column: 1 / -1; justify-content: flex-start; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Listening test: <span id="take"></span></h1>
+  <p>One transport, every version of the take. Click a row or press its key to switch; playback keeps its place.
+     <kbd>Space</kbd> plays and pauses, <kbd>←</kbd> <kbd>→</kbd> skip 5 s. Mark each render, then copy the verdict out.</p>
+
+  <div class="transport">
+    <div class="row">
+      <button id="play">Play</button>
+      <span id="now"></span>
+      <label><input type="checkbox" id="blind"> Blind (hide names, shuffle order)</label>
+      <span id="time"></span>
+    </div>
+    <canvas id="wave" width="1960" height="192"></canvas>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--tonal);outline:1px solid var(--accent)"></span>pitched stretch (drives the phrase voice)</span>
+      <span><span class="sw" style="background:var(--kick)"></span>kick</span>
+      <span><span class="sw" style="background:var(--snare)"></span>snare</span>
+      <span><span class="sw" style="background:var(--hat)"></span>hat</span>
+    </div>
+  </div>
+
+  <div class="sources" id="sources"></div>
+  <textarea id="notes" placeholder="Notes: which moments worked, which sounds, what felt wrong…"></textarea>
+  <div class="row" style="margin-top:10px">
+    <button id="copy">Copy verdict</button><span id="copied"></span>
+  </div>
+</main>
+
+<script>
+const DATA = /*DATA*/null;
+const KEY = "takedown-week0:" + DATA.take;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let state = { verdicts: {}, unique: {}, notes: "" };
+try { state = Object.assign(state, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+document.getElementById("take").textContent = DATA.take;
+const audios = {};
+for (const s of DATA.sources) { const a = new Audio(s.file); a.preload = "auto"; audios[s.id] = a; }
+let current = DATA.sources[0].id, playing = false, order = DATA.sources.map(s => s.id), blind = false;
+
+function shuffle(ids) {  // the take stays first; renders are shuffled
+  const r = ids.slice(1);
+  for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
+  return [ids[0], ...r];
+}
+const src = id => DATA.sources.find(s => s.id === id);
+const keyOf = i => i === 0 ? "0" : i <= 9 ? String(i) : "";
+const shown = (id, i) => (blind && id !== "original") ? "Render " + String.fromCharCode(64 + i) : src(id).label;
+
+function select(id) {
+  if (id === current) return;
+  const t = audios[current].currentTime;
+  audios[current].pause();
+  current = id;
+  audios[id].currentTime = t;
+  if (playing) audios[id].play();
+  draw(); list();
+}
+function toggle() {
+  playing = !playing;
+  if (playing) audios[current].play(); else audios[current].pause();
+  document.getElementById("play").textContent = playing ? "Pause" : "Play";
+}
+function seek(t) { audios[current].currentTime = Math.max(0, Math.min(DATA.duration - 0.05, t)); draw(); }
+
+function list() {
+  const box = document.getElementById("sources");
+  box.textContent = "";
+  order.forEach((id, i) => {
+    const s = src(id), row = document.createElement("div");
+    row.className = "src" + (id === current ? " on" : "");
+    row.onclick = () => select(id);
+    const k = document.createElement("div"); k.className = "key"; k.innerHTML = keyOf(i) ? "<kbd>" + keyOf(i) + "</kbd>" : "";
+    const mid = document.createElement("div");
+    const nm = document.createElement("div"); nm.className = "name"; nm.textContent = shown(id, i);
+    const bl = document.createElement("div"); bl.className = "blurb"; bl.textContent = (blind && id !== "original") ? "" : s.blurb;
+    mid.append(nm, bl);
+    row.append(k, mid);
+    if (id !== "original") {
+      const v = document.createElement("div"); v.className = "verdict";
+      for (const [val, text] of [["yes", "Would use"], ["close", "Close"], ["no", "No"]]) {
+        const b = document.createElement("button"); b.textContent = text; b.dataset.v = val;
+        if (state.verdicts[id] === val) b.className = "sel";
+        b.onclick = e => { e.stopPropagation(); state.verdicts[id] = state.verdicts[id] === val ? undefined : val; save(); list(); };
+        v.append(b);
+      }
+      const lab = document.createElement("label"), cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = !!state.unique[id];
+      cb.onclick = e => { e.stopPropagation(); state.unique[id] = cb.checked; save(); };
+      lab.onclick = e => e.stopPropagation();
+      lab.append(cb, " couldn't make this another way");
+      v.append(lab);
+      row.append(v);
+    }
+    box.append(row);
+  });
+  document.getElementById("now").textContent = shown(current, order.indexOf(current));
+}
+
+const cv = document.getElementById("wave"), g = cv.getContext("2d");
+function draw() {
+  const W = cv.width, H = cv.height, d = DATA.duration, x = t => t / d * W;
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = css("--tonal");
+  for (const [a, b] of DATA.tonal) g.fillRect(x(a), 0, Math.max(1, x(b) - x(a)), H);
+  g.fillStyle = css("--wave");
+  const n = DATA.peaks.length;
+  DATA.peaks.forEach(([lo, hi], i) => { const y0 = H / 2 - hi * H * 0.42, y1 = H / 2 - lo * H * 0.42; g.fillRect(i / n * W, y0, Math.max(1, W / n), Math.max(1, y1 - y0)); });
+  for (const [t, role] of DATA.hits) { g.fillStyle = css("--" + role); g.fillRect(x(t), H - 18, 2, 18); }
+  g.fillStyle = css("--ink");
+  g.fillRect(x(audios[current].currentTime), 0, 2, H);
+  const f = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+  document.getElementById("time").textContent = f(audios[current].currentTime) + " / " + f(d);
+}
+cv.onclick = e => { const r = cv.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * DATA.duration); };
+(function tick() { if (playing) { draw(); if (audios[current].ended) toggle(); } requestAnimationFrame(tick); })();
+
+document.getElementById("play").onclick = toggle;
+document.getElementById("blind").onchange = e => { blind = e.target.checked; order = blind ? shuffle(DATA.sources.map(s => s.id)) : DATA.sources.map(s => s.id); list(); };
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "TEXTAREA") return;
+  if (e.code === "Space") { e.preventDefault(); toggle(); }
+  else if (e.code === "ArrowLeft") seek(audios[current].currentTime - 5);
+  else if (e.code === "ArrowRight") seek(audios[current].currentTime + 5);
+  else if (/^[0-9]$/.test(e.key) && order[+e.key]) select(order[+e.key]);
+});
+const notes = document.getElementById("notes");
+notes.value = state.notes || "";
+notes.oninput = () => { state.notes = notes.value; save(); };
+document.getElementById("copy").onclick = async () => {
+  const word = { yes: "would use", close: "close", no: "no" };
+  const lines = DATA.sources.filter(s => s.id !== "original").map(s =>
+    s.label + ": " + (word[state.verdicts[s.id]] || "not marked") + (state.unique[s.id] ? " (couldn't make this another way)" : ""));
+  const text = "Listening verdict, " + DATA.take + "\n" + lines.join("\n") + (state.notes ? "\n\nNotes:\n" + state.notes : "");
+  try { await navigator.clipboard.writeText(text); document.getElementById("copied").textContent = "Copied."; }
+  catch (err) { document.getElementById("copied").textContent = "Copy failed; select the text instead: " + text; }
+};
+list(); draw();
+</script>
+</body>
+</html>

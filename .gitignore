@@ -22,3 +22,6 @@ Thumbs.db
 .vscode/
 # Agent worktrees
 .claude/worktrees/
+# analysis output written next to the repo root by hand; it belongs in research/out/
+/*.frames.csv
+/*.onsets.csv
