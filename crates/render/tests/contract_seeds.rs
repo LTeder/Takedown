@@ -21,6 +21,13 @@ fn is_hit(t: &BoundTrigger) -> bool {
     matches!(t.kind, BoundKind::Hit { .. })
 }
 
+/// A hit whose sound depends on its seeds in the toy backend. At full mouth
+/// with no breath the toy plays only the take's slice, which no seed touches
+/// (and with no take, nothing), so rerolling such a hit is rightly inaudible.
+fn has_synth_body(t: &BoundTrigger) -> bool {
+    matches!(t.kind, BoundKind::Hit { mouth, breath, .. } if mouth.get() < 127 || breath.get() > 0)
+}
+
 /// Every anchor in the track.
 fn anchors(t: &ControlTrack) -> Vec<u64> {
     t.hits()
@@ -103,11 +110,11 @@ proptest! {
                     "segment {} has no trigger in the region but changed", k
                 );
             }
-            if affected.iter().any(is_hit) {
+            if affected.iter().any(has_synth_body) {
                 prop_assert!(first_bit_difference(&a, &b).is_some(), "a region roll over a hit is inaudible");
             }
             let mut mangled = case.tree.clone();
-            if mangled.roll(Aspect::Mangle) && v.bound.triggers().iter().any(is_hit) {
+            if mangled.roll(Aspect::Mangle) && v.bound.triggers().iter().any(has_synth_body) {
                 let m = ToyVoice::bind(&v.cfg, &case.track, case.out_rate, &mangled, VOICE_NAMES[i], case.max_block);
                 prop_assert!(first_bit_difference(&a, &m.mono(len)).is_some(), "a Mangle roll is inaudible");
             }
