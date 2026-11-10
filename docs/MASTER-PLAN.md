@@ -4,6 +4,8 @@
 
 *v1.2, 2026-11-09: the founder approved three changes from the first build pass (render hooks driven by a core-owned driver, gate spans instead of a gate curve, f0 at capture rate). They are folded into §3, §4.1 and §4.6 below; the reasoning is in docs/design/core-types.md and DECISIONS.md.*
 
+*Addendum, 2026-11-10: Week 0 is being run with sounds Claude synthesises (`research/week0/render.py`), not the founder's synths, and a re-evaluation (`docs/research/09-re-evaluation.md`) recommends re-baselining §5 and §6 once the founder has listened. Until then §2's palette row, §5's dates and gates and §6's risks are known to be stale, and later DECISIONS entries win where they conflict with this plan.*
+
 ---
 
 ## 1. What Takedown is

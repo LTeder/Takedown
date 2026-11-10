@@ -6,9 +6,9 @@ Open-source (GPL-3.0-or-later) Rust tool: beatbox, hum or breathe into a mic and
 
 - `docs/STATUS.md` is where the project stands: what is done, the latest numbers, open findings, what comes next.
 - `docs/design/core-types.md` specifies the `core` types and the render contract; read the relevant section before changing either.
-- `docs/MASTER-PLAN.md` is authoritative. Where any other doc conflicts with it, the master plan wins.
+- `docs/MASTER-PLAN.md` is authoritative. Where any other doc conflicts with it, the master plan wins, except a `docs/DECISIONS.md` entry dated after the plan's version, which wins until the plan is revised to match.
 - `docs/DECISIONS.md` is the append-only decisions log; add an entry whenever you make a call the code does not explain.
-- `docs/research/05`–`08` are adversarial reviews; `06` (engine), `07` (types and threading) and `08` (DSP recipes, licences) hold detail the plan refers to. Open sections on demand. `docs/research/00`–`04` are the original survey and are superseded. Research docs are expected to rot; the maintained rules are CLAUDE.md, MASTER-PLAN.md, LICENSES.md and DECISIONS.md.
+- `docs/research/09-re-evaluation.md` (November 2026) is the latest review of the whole project: what to keep, what to freeze, what comes next. `docs/research/05`–`08` are earlier adversarial reviews; `06` (engine), `07` (types and threading) and `08` (DSP recipes, licences) hold detail the plan refers to. Open sections on demand. `docs/research/00`–`04` are the original survey and are superseded. Research docs are expected to rot; the maintained rules are CLAUDE.md, MASTER-PLAN.md, LICENSES.md and DECISIONS.md.
 
 ## Hard rules
 
@@ -33,7 +33,8 @@ Open-source (GPL-3.0-or-later) Rust tool: beatbox, hum or breathe into a mic and
 - Clippy clean, `cargo fmt`, no `unsafe` without a comment saying why.
 - The Rust toolchain is pinned in `rust-toolchain.toml` to the latest stable release, and local builds and CI both use the pin. Bump it soon after each stable release, fixing any new clippy lints in the same commit; the founder prefers staying current over staying put.
 - All JSON writes go through `core::project::json`, which writes every `f32` so it reads back exactly. Versioned files are read through `core::migrate::load`, which checks the version and refuses repeated keys. Never decode typed values from a `serde_json::Value`: it reads `f32` through `f64` and keeps only the last of repeated keys.
-- Evaluation output (CSVs, scoreboards, plots) goes to `research/out/`, which is gitignored.
+- Evaluation output (CSVs, scoreboards, plots, renders) goes to `research/out/`, which is gitignored.
+- Sound comes before infrastructure. `core` and the render contract are frozen until a real voice, lens or app needs a change. A work session should end in something the founder can listen to; Claude cannot hear, so it checks sound by measurement and says so.
 
 ## Do not propose
 

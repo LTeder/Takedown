@@ -1,6 +1,6 @@
 # Status
 
-*2026-10-21, after the first unattended session (steps 1 to 6 of the kickoff list); updated 2026-11-09 with the founder's first take and review. Newest first in "Next"; numbers are reproducible with `research/README.md`.*
+*2026-10-21, after the first unattended session (steps 1 to 6 of the kickoff list); updated 2026-11-09 with the founder's first take and review, and 2026-11-10 with the sound sketch and the re-evaluation. Newest first in "Next"; numbers are reproducible with `research/README.md`.*
 
 ## Done
 
@@ -50,6 +50,15 @@ All from `takedown analyze` with default settings, scored by `research/eval/scor
 - **Voicing on a room tone.** A steady tone near 59 Hz, most likely the ceiling fan, is called voiced in pauses: 1,453 frames (7 s) below 62 Hz at a median loudness of -71 dB. Same root cause as voicing in noise above.
 - **Whistle:** tracked where it stays under the decoder's 1,100 Hz ceiling, unvoiced above it.
 
+## Sound sketch (2026-11-10)
+
+The first thing in the repository that makes sound. `research/week0/render.py` plays a take through three palettes synthesised in `research/week0/sketch.py` (rubber, crushed, struck), with three dice rolls each, and writes a listening page that switches between the take and every render in place. It is throwaway Python, built to find out whether sounds designed by Claude and driven by the founder's mouth are exciting before any Rust engine exists.
+
+- **Rendered:** the founder's first take, 179 s: 355 hits (80 kick, 135 snare, 140 hat), 38 phrase accents, 43 onsets dropped, 60 s of pitched phrase. Nine renders plus a control take about half a minute.
+- **Checked by measurement, not by ear** (Claude cannot hear): attacks reach half peak 0.4 ms after the onset in rubber and crushed; all files at -16 LUFS; under 0.5% of samples in the soft-clip zone; spectrograms show the kicks' pitch drops, the phrase voice following the hum's glides, and each palette's character. Whether any of it sounds good is the founder's call and has not been made.
+- **Roles:** a hit is a kick if it lifts the 60 to 200 Hz band above that band's floor; the rest split into snare and hat by brightness. Against AVP's labels: 61% overall, 92% of kicks found (brightness alone: 53%). The founder's kicks are breathy, so brightness alone had filed most of them under hat.
+- **The control render** gives each hit another hit's loudness, brightness, length and role. If it sounds as good as the real render, the performance is not audible in the result.
+
 ## Assumptions
 
 Every assumption is a dated entry in `docs/DECISIONS.md`. The ones most worth a look:
@@ -60,10 +69,12 @@ Every assumption is a dated entry in `docs/DECISIONS.md`. The ones most worth a 
 
 ## Next
 
-1. **Week 0 listening pre-check** (MASTER-PLAN §5). `research/week0/precheck.py` (2026-11-09) turns fills into per-role drum MIDI and hums into MPE. The founder's part remains: record about ten fills, three hums and a short teach take per sound, play them through drum and FM patches with distortion in Reaper (`research/README.md`), and decide whether anything excites.
-2. **Record the golden set** (docs/RECORDING-PROTOCOL.md). Every number above is a proxy until the founder's own hums, fills and noisy-room takes are scored; gate E1 is defined on them.
-3. **Voicing in noise.** Fuse voiced probability with loudness relative to the take's floor and with CPP, or make the threshold adaptive per take; test on the fan-noise recordings and on the 59 Hz room tone in the founder's first take. This is the one evidence curve that clearly fails today. The fix is to the conservative voicing that evaluation reports; eager voicing for sound is a separate lens setting (DECISIONS, 2026-11-09).
-4. **Octave-down errors.** A decoder rule or prior for subharmonic troughs that are only marginally deeper than the fundamental's (vocadito_34).
-5. **drums crate.** Onset refinement into `Hit` events using the stored strength and rise (a level floor against the take for near-silence, rise and strength against noise, per the founder's first take), the "b + oom" merge, per-user kNN roles; score per-user accuracy at 5 and 10 shots on AVP.
-6. **lens and the first backend** in `render`, to reach the week-4 gate; then the midi crate with the deferred projection and its round-trip tests.
-7. **Smaller items.** Bump the pinned toolchain after each stable release (the founder's preference; 1.100 is due around 12 November 2026); decide whether whistles above 1,100 Hz should be voiced; parallelise or downsample f0 if analysis time matters in the app; persist the scoreboard baseline so CI can fail on regressions (docs/research/08 §7).
+Reordered on 2026-11-10 after the re-evaluation (`docs/research/09-re-evaluation.md`). Sound first; `core` is frozen until something uses it.
+
+1. **The founder listens to the sketch** and gives a verdict per render: open `research/out/week0/<take>/index.html` after running `research/week0/render.py` on a take. This is the Week 0 check from MASTER-PLAN §5, with Claude's sounds in place of the founder's synths. If nothing excites, the plan says stop.
+2. **Fix the gain-dependent onset detector** (recall falls from 0.93 to 0.42 when the audio is 20 dB quieter) and add one primitive to evidence: level above the take's own noise floor. Tests that vary gain and that start in room tone. The floor also fixes the fan tone called voiced and the false onsets in quiet stretches.
+3. **Iterate the sketch by ear:** a texture voice for breath and noise (the noise passage is material, not error), continuous mapping in place of hard roles, more of the mouth as exciter. Compare Plaits blind against purpose-built voices before depending on it.
+4. **Port what wins to Rust** behind the render contract, with a thin lens and `cli render`. Let that slice reshape `HitEvent` and the sliders; add the session glue (mix, play, stems per role) then. The drums crate grows out of this, not ahead of it.
+5. **Re-baseline MASTER-PLAN** after the verdict: dates, a week-4 gate with a control condition and recorded reasons, a risk register that names the founder's listening time.
+6. **Golden set, reordered.** Record the raw material when convenient (three input levels, a throat-bass item, two seconds of room tone first); annotate only what a decision needs.
+7. **Smaller items.** The confirmed defects in 09 (edit edge cases, hit-cache validation, onset at 0 in room tone, evidence cache key, `score.py --threshold`); patch `core-types.md` where the code departs from it; decide the live monitor's causal path before the lens depends on offline shapes; bump the toolchain when 1.100 ships.
