@@ -59,6 +59,21 @@ The first thing in the repository that makes sound. `research/week0/render.py` p
 - **Roles:** a hit is a kick if it lifts the 60 to 200 Hz band above that band's floor; the rest split into snare and hat by brightness. Against AVP's labels: 61% overall, 92% of kicks found (brightness alone: 53%). The founder's kicks are breathy, so brightness alone had filed most of them under hat.
 - **The control render** gives each hit another hit's loudness, brightness, length and role. If it sounds as good as the real render, the performance is not audible in the result.
 
+## Round 2: loops (2026-11-10)
+
+The founder's verdict on round 1: none hit the mark; crushed best tonally; all lacked musicality and rhythm; small sections of each usable. Round 2 (`research/week0/loop.py`) turns the take into an 8-bar loop at the performed tempo and swing (109 BPM, swing 0.21 sixteenths, A minor) with a bassline from the hum, names the snare by what lands on beats 2 and 4, and renders it through six new palettes written by Sonnet designers and checked by Sonnet reviewers, next to the founder's own sounds re-sequenced and round-1 crushed. Listening page: `research/out/week0/01-261109_1228-loop/index.html`. Measured (roll 1, `research/week0/measure.py`; not heard):
+
+| render | punch dB | on-grid % | drone % | below 100 Hz % | follows velocity | follows brightness |
+|---|---|---|---|---|---|---|
+| your sounds, re-sequenced | 13.5 | 22 | 24 | 13 | 0.70 | 0.22 |
+| crushed (round 1) | 6.2 | 26 | 17 | 25 | 0.85 | 0.12 |
+| westcoast | 16.2 | 61 | 16 | 23 | 0.94 | 0.53 |
+| fmmetal | 15.4 | 62 | 15 | 42 | 0.91 | 0.61 |
+| filterscream | 16.1 | 54 | 10 | 22 | 0.97 | 0.69 |
+| voicecross | 11.5 | 50 | 11 | 32 | 0.82 | 0.49 |
+| plugins | 18.6 | 57 | 9 | 40 | 0.89 | 0.61 |
+| glitch | 20.3 | 52 | 8 | 21 | 0.92 | 0.41 |
+
 ## Assumptions
 
 Every assumption is a dated entry in `docs/DECISIONS.md`. The ones most worth a look:
@@ -71,7 +86,7 @@ Every assumption is a dated entry in `docs/DECISIONS.md`. The ones most worth a 
 
 Reordered on 2026-11-10 after the re-evaluation (`docs/research/09-re-evaluation.md`). Sound first; `core` is frozen until something uses it.
 
-1. **The founder listens to the sketch** and gives a verdict per render: open `research/out/week0/<take>/index.html` after running `research/week0/render.py` on a take. This is the Week 0 check from MASTER-PLAN §5, with Claude's sounds in place of the founder's synths. If nothing excites, the plan says stop.
+1. **The founder listens to round 2** (the loop page above) and gives a verdict per render. Round 1 is done: nothing hit the mark, crushed was best tonally, rhythm and musicality were missing. This is the Week 0 check from MASTER-PLAN §5, with Claude's sounds in place of the founder's synths. If nothing excites, the plan says stop; whatever does excite seeds the next round and, later, the Rust voices.
 2. **Fix the gain-dependent onset detector** (recall falls from 0.93 to 0.42 when the audio is 20 dB quieter) and add one primitive to evidence: level above the take's own noise floor. Tests that vary gain and that start in room tone. The floor also fixes the fan tone called voiced and the false onsets in quiet stretches.
 3. **Iterate the sketch by ear:** a texture voice for breath and noise (the noise passage is material, not error), continuous mapping in place of hard roles, more of the mouth as exciter. Compare Plaits blind against purpose-built voices before depending on it.
 4. **Port what wins to Rust** behind the render contract, with a thin lens and `cli render`. Let that slice reshape `HitEvent` and the sliders; add the session glue (mix, play, stems per role) then. The drums crate grows out of this, not ahead of it.

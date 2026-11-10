@@ -60,6 +60,16 @@ open out/week0/TAKE/index.html
 
 **The decision.** If nothing excites you, the plan says stop. If something does, say what: which stretch, which palette, what made it work.
 
+**Round 2: loops.** The founder found round 1 unmusical and not rhythmic enough, so round 2 renders a loop instead of the whole take:
+
+```bash
+uv run python week0/loop.py TAKE.wav                 # every palette, 2 rolls each
+uv run python week0/loop.py TAKE.wav --palettes crushed westcoast --rolls 3
+uv run python week0/measure.py out/week0/TAKE-loop   # numbers per render, since Claude cannot listen
+```
+
+`week0/loop.py` finds the tempo and swing of the beatboxed stretches, takes the tightest two bars as the pattern and another two as a fill, names the snare by what lands on beats 2 and 4, turns the most melodic hummed phrase into a bassline in its key that plucks on the kicks, and renders 8 bars through each palette, next to your own sounds re-sequenced into the same loop. Palettes are the three round-1 ones in `week0/sketch.py` plus one module per palette in `week0/palettes/`; a palette can also render the whole loop itself (pattern transformations, plugin hosting). `week0/measure.py` explains its columns in its docstring: they catch broken, smeared or performance-deaf renders, and say nothing about whether a render sounds good.
+
 `week0/precheck.py` is the earlier version of this test: it writes drum MIDI and MPE for your own synths instead of audio (`fills` and `hums` subcommands; teach takes with `--kick --snare --hat` raise role accuracy to about 73%). It still works and nothing depends on it.
 
 ## Listening check

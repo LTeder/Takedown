@@ -53,7 +53,7 @@
 <body>
 <main>
   <h1>Listening test: <span id="take"></span></h1>
-  <p>One transport, every version of the take. Click a row or press its key to switch; playback keeps its place.
+  <p>One transport, every version of the take. Click a row or press its key (0 to 9, then q to p) to switch; playback keeps its place.
      <kbd>Space</kbd> plays and pauses, <kbd>←</kbd> <kbd>→</kbd> skip 5 s. Mark each render, then copy the verdict out.</p>
 
   <div class="transport">
@@ -82,6 +82,7 @@
 <script>
 const DATA = /*DATA*/null;
 const KEY = "takedown-week0:" + DATA.take;
+const REF = DATA.sources[0].id;  // the reference row: no verdict, never shuffled or hidden
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let state = { verdicts: {}, unique: {}, notes: "" };
 try { state = Object.assign(state, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
@@ -89,7 +90,7 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } c
 
 document.getElementById("take").textContent = DATA.take;
 const audios = {};
-for (const s of DATA.sources) { const a = new Audio(s.file); a.preload = "auto"; audios[s.id] = a; }
+for (const s of DATA.sources) { const a = new Audio(s.file); a.preload = "auto"; a.loop = DATA.duration < 60;  // short loops repeat audios[s.id] = a; }
 let current = DATA.sources[0].id, playing = false, order = DATA.sources.map(s => s.id), blind = false;
 
 function shuffle(ids) {  // the take stays first; renders are shuffled
@@ -98,8 +99,9 @@ function shuffle(ids) {  // the take stays first; renders are shuffled
   return [ids[0], ...r];
 }
 const src = id => DATA.sources.find(s => s.id === id);
-const keyOf = i => i === 0 ? "0" : i <= 9 ? String(i) : "";
-const shown = (id, i) => (blind && id !== "original") ? "Render " + String.fromCharCode(64 + i) : src(id).label;
+const KEYS = "0123456789qwertyuiop";  // row i plays on KEYS[i]
+const keyOf = i => KEYS[i] || "";
+const shown = (id, i) => (blind && id !== REF) ? "Render " + String.fromCharCode(64 + i) : src(id).label;
 
 function select(id) {
   if (id === current) return;
@@ -127,10 +129,10 @@ function list() {
     const k = document.createElement("div"); k.className = "key"; k.innerHTML = keyOf(i) ? "<kbd>" + keyOf(i) + "</kbd>" : "";
     const mid = document.createElement("div");
     const nm = document.createElement("div"); nm.className = "name"; nm.textContent = shown(id, i);
-    const bl = document.createElement("div"); bl.className = "blurb"; bl.textContent = (blind && id !== "original") ? "" : s.blurb;
+    const bl = document.createElement("div"); bl.className = "blurb"; bl.textContent = (blind && id !== REF) ? "" : s.blurb;
     mid.append(nm, bl);
     row.append(k, mid);
-    if (id !== "original") {
+    if (id !== REF) {
       const v = document.createElement("div"); v.className = "verdict";
       for (const [val, text] of [["yes", "Would use"], ["close", "Close"], ["no", "No"]]) {
         const b = document.createElement("button"); b.textContent = text; b.dataset.v = val;
@@ -176,14 +178,14 @@ document.addEventListener("keydown", e => {
   if (e.code === "Space") { e.preventDefault(); toggle(); }
   else if (e.code === "ArrowLeft") seek(audios[current].currentTime - 5);
   else if (e.code === "ArrowRight") seek(audios[current].currentTime + 5);
-  else if (/^[0-9]$/.test(e.key) && order[+e.key]) select(order[+e.key]);
+  else if (!e.metaKey && !e.ctrlKey && KEYS.includes(e.key) && order[KEYS.indexOf(e.key)]) select(order[KEYS.indexOf(e.key)]);
 });
 const notes = document.getElementById("notes");
 notes.value = state.notes || "";
 notes.oninput = () => { state.notes = notes.value; save(); };
 document.getElementById("copy").onclick = async () => {
   const word = { yes: "would use", close: "close", no: "no" };
-  const lines = DATA.sources.filter(s => s.id !== "original").map(s =>
+  const lines = DATA.sources.filter(s => s.id !== REF).map(s =>
     s.label + ": " + (word[state.verdicts[s.id]] || "not marked") + (state.unique[s.id] ? " (couldn't make this another way)" : ""));
   const text = "Listening verdict, " + DATA.take + "\n" + lines.join("\n") + (state.notes ? "\n\nNotes:\n" + state.notes : "");
   try { await navigator.clipboard.writeText(text); document.getElementById("copied").textContent = "Copied."; }

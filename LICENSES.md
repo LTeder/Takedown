@@ -14,6 +14,8 @@ Takedown is GPL-3.0-or-later. Every third-party component, model weight set and 
 | realfft, rustfft (HEnquist, ejmahler) | MIT; MIT OR Apache-2.0 | `evidence` FFTs (YIN, spectra, cepstrum) | crates.io |
 | hound (ruuda) | Apache-2.0 | `cli` WAV reading | crates.io |
 | Transitive crates.io dependencies | MIT, Apache-2.0, CC0-1.0, MIT-0 or Unlicense (each dual- or multi-licensed) | Pulled in by the rows above | Checked with `cargo metadata` on 2026-10-21; recheck when adding a dependency |
+| pedalboard (spotify/pedalboard) | GPL-3.0 | `research/week0` only: hosts audio plugins to render sketches | Python, never linked into Takedown |
+| Installed third-party plugins (Surge XT, Applied Acoustics Systems Session instruments, Airwindows effects) | GPL-3.0-only; proprietary freeware; MIT | `research/week0` only: rendered as research oracles on the founder's machine | Nothing copied or shipped; the patch values found are the only artefact |
 | Pretrained model checkpoints (SwiftF0, PESTO, CREPE, ...) | Varies (code MIT/LGPL; weights trained on mixed-licence data) | Evaluation and comparison in `research/`; shipping decided per model with provenance recorded here | Policy: prefer clean sets, retrain where cheap |
 
 ## Datasets
